@@ -1,0 +1,74 @@
+// tools/e2e-watch.mjs — regression test for the undo/redo + auto-watcher
+// interplay with REAL timings:
+//   1. a config change auto-snapshots (watcher works)
+//   2. undo restores and does NOT trigger its own auto snapshot (suppression)
+//   3. redo then succeeds (would have been blocked before the fix)
+// Run:  node tools/e2e-watch.mjs
+import { mkdtemp, writeFile, readFile, mkdir, rm } from 'node:fs/promises';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { apply } from '../lib/index.js';
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+const root = await mkdtemp(join(tmpdir(), 'dsh-undo-e2e-'));
+const home = join(root, 'home');
+const profile = join(root, 'profile');
+const snapDir = join(root, 'snapshots');
+await mkdir(home, { recursive: true });
+await mkdir(profile, { recursive: true });
+await writeFile(join(home, 'settings.yaml'), 'model: x\n');
+await writeFile(join(profile, 'cordis.patch.yml'), '# patch\n[]\n');
+
+const tools = new Map();
+const ctx = {
+  tools: { register: (t) => { tools.set(t.name, t); return () => { }; } },
+  systemPrompt: { section: () => () => { } },
+  get: () => undefined,
+  effect: (fn) => { const d = fn(); return d ?? (() => { }); },
+  logger: { info: () => { }, warn: (...a) => console.warn('[warn]', ...a) },
+};
+apply(ctx, { snapshotDir: snapDir, homeDir: home, profileDir: profile, watch: true, watchDebounceMs: 300, keepAuto: 10 });
+await sleep(600); // baseline lands
+
+let pass = 0, fail = 0;
+const check = (cond, label) => { if (cond) { pass++; console.log('  ok  -', label); } else { fail++; console.error('  FAIL -', label); } };
+const run = async (name, args) => (await tools.get(name).execute(args, {}));
+const curSettings = async () => readFile(join(home, 'settings.yaml'), 'utf8');
+const autoCount = async () => {
+  const out = await run('undo_list', {});
+  return (out.match(/config-change/g) || []).length;
+};
+
+console.log('== 1. config change auto-snapshots ==');
+await writeFile(join(home, 'settings.yaml'), 'model: y\n');
+await sleep(1200);
+const before = await autoCount();
+check(before >= 1, `auto snapshot appeared (${before})`);
+
+console.log('== 2. undo restores and suppresses its own auto snapshot ==');
+const out = await run('undo_restore', { mode: 'undo' });
+console.log('   ', out.split('\n')[0]);
+check((await curSettings()) === 'model: x\n', 'settings.yaml restored to x');
+await sleep(1200); // if suppression failed, an auto snapshot would appear here
+const after = await autoCount();
+check(after === before, `no auto snapshot from the undo itself (${before} -> ${after})`);
+
+console.log('== 3. redo succeeds (was blocked before the fix) ==');
+const redo = await run('undo_restore', { mode: 'redo' });
+console.log('   ', redo.split('\n')[0]);
+check(!redo.includes('blocked') && !redo.includes('failed'), 'redo not blocked');
+check((await curSettings()) === 'model: y\n', 'settings.yaml re-applied to y');
+
+console.log('== 4. real new change still blocks redo (correct semantics) ==');
+await writeFile(join(home, 'settings.yaml'), 'model: z\n');
+await sleep(1200); // auto snapshot of the new change
+await run('undo_restore', { mode: 'undo' }); // undo it
+await writeFile(join(home, 'settings.yaml'), 'model: w\n');
+await sleep(1200); // ANOTHER real change after the undo
+const blocked = await run('undo_restore', { mode: 'redo' });
+check(blocked.includes('blocked'), 'redo blocked when a real new change exists');
+
+await rm(root, { recursive: true, force: true });
+console.log(`\n== RESULT: ${pass} passed, ${fail} failed ==`);
+process.exit(fail > 0 ? 1 : 0);

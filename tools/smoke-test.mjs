@@ -118,6 +118,36 @@ console.log('== 10. diff works ==');
 out = await run('undo_diff', { snapshot_id: id1 });
 check(out.includes('Diff of'), 'diff produced');
 
+console.log('== 11. undo with all-identical snapshots says unchanged ==');
+const root2 = await mkdtemp(join(tmpdir(), 'dsh-undo-test2-'));
+const home2 = join(root2, 'home');
+const profile2 = join(root2, 'profile');
+const snap2 = join(root2, 'snapshots');
+await mkdir(home2, { recursive: true });
+await mkdir(profile2, { recursive: true });
+await writeFile(join(home2, 'settings.yaml'), 'model: x\n');
+await writeFile(join(profile2, 'cordis.patch.yml'), '# patch\n[]\n');
+const tools2 = new Map();
+const ctx2 = {
+  tools: { register: (t) => { tools2.set(t.name, t); return () => { }; } },
+  systemPrompt: { section: () => () => { } },
+  get: () => undefined,
+  effect: (fn) => { const d = fn(); return d ?? (() => { }); },
+  logger: { info: () => { }, warn: () => { } },
+};
+apply(ctx2, { snapshotDir: snap2, homeDir: home2, profileDir: profile2, watch: false });
+await new Promise((r) => setTimeout(r, 150));
+const run2 = async (name, args) => (await tools2.get(name).execute(args, {}));
+await run2('undo_snapshot', { reason: 'dup-a' });
+await run2('undo_snapshot', { reason: 'dup-b' });
+out = await run2('undo_restore', { mode: 'undo' });
+console.log('   ', out.split('\n')[0]);
+check(out.includes('nothing to undo') || out.includes('already matches'), 'identical states -> clear unchanged message');
+check(!out.includes('failed'), 'unchanged is not a failure');
+out = await run2('undo_restore', { mode: 'undo' });
+check(out.includes('nothing to undo') || out.includes('already matches'), 'repeat undo stays unchanged');
+await rm(root2, { recursive: true, force: true });
+
 await rm(root, { recursive: true, force: true });
 console.log(`\n== RESULT: ${pass} passed, ${fail} failed ==`);
 process.exit(fail > 0 ? 1 : 0);
