@@ -12,13 +12,13 @@ An undo/rollback system for [DeepSeek Harness (DSH)](https://github.com/deepseek
 |---|---|
 | ![1](docs/1.png) | ![2](docs/2.png) |
 
-| Settings: shortcuts & snapshot options | Offline GUI (DSH Undo Manager) |
+| Settings: shortcuts & snapshot options | Offline GUI v2 (save / undo / redo / restore / delete / clean-up / export / import / settings) |
 |---|---|
 | ![3](docs/3.png) | ![4](docs/4.png) |
 
-| One-click export of all snapshots (backup / migration) |
-|---|
-| ![5](docs/5.png) |
+| One-click export of all snapshots (backup / migration) | Offline window: double-click a row to view its diff | Offline window: minimize to system tray |
+|---|---|---|
+| ![5](docs/5.png) | ![6](docs/6.png) | ![7](docs/7.png) |
 
 ## Features
 
@@ -34,7 +34,7 @@ An undo/rollback system for [DeepSeek Harness (DSH)](https://github.com/deepseek
 | **Undo/redo stack** | Multiple consecutive undos; redo re-applies the pre-undo state (blocked when newer changes exist); every restore first preserves the current state as a "pre-restore" snapshot |
 | **Crash self-check** | Detects when the previous DSH run crashed before finishing startup, warns in the snapshot list and panel, and suggests rolling back to the last good state |
 | **Export / import** | One-click ZIP export of all snapshots (backup / moving machines); import restores into the right store by kind and skips duplicates; panel buttons, chat tools and offline CLI all supported |
-| **Offline tools** | CLI (`snapshot/undo/redo/restore/remove/list/diff/prune/status`) + **GUI window** (desktop shortcut) + safe plugin-install wrapper |
+| **Offline tools** | CLI (`snapshot/undo/redo/restore/remove/list/diff/prune/export/import/status`) + **GUI window v2** (crash banner with one-click rollback, export/import, double-click diff preview, clean-up, settings panel, system tray) + safe plugin-install wrapper |
 
 ## What is snapshotted & where
 
