@@ -1,13 +1,14 @@
 {
   "name": "dsh-undo",
   "version": "0.1.0",
-  "description": "DSH undo/rollback system: snapshot config files on change, undo/redo the last action from the WebUI or by chat, and roll back broken plugin trees without reinstalling. Local-only plugin.",
+  "description": "DSH undo/rollback system: snapshot config files on change, undo/redo the last action from the WebUI or by chat, and roll back broken plugin trees without reinstalling. Works even when DSH fails to boot (offline CLI + GUI).",
   "private": true,
   "type": "module",
   "main": "lib/index.js",
   "exports": {
     ".": "./lib/index.js",
     "./client": "./lib/client.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
     "./package.json": "./package.json"
   },
   "engines": {
@@ -15,11 +16,14 @@
     "node": ">=20.0.0"
   },
   "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
     "client": {
       "platform": "web",
       "inject": ["slots", "locale"]
     }
   },
-  "files": ["lib", "tools"],
+  "files": ["lib", "tools", "cordis.patch.yml"],
   "license": "MIT"
 }

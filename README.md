@@ -45,6 +45,16 @@
 
 前置:已安装 DSH(`@deepseek-ai/dsh`)与 Node.js(≥20)。
 
+**方式 A(推荐,生态标准一条命令)** — 本插件已声明 `dsh.bundle` manifest,可直接用官方插件命令安装:
+
+```bat
+dsh plugin --profile web add github:lire1131/dsh-undo-plugin#main
+```
+
+安装完成后重启 DSH 即生效(快照目录、参数等均可在设置中修改)。
+
+**方式 B(本地源码/免发布)** — clone 到本地目录并手工挂载:
+
 1. **把仓库放到本地插件目录**(无中文路径更稳妥),例如 `D:\dsh\plugins\dsh-undo`:
 
 ```bat
