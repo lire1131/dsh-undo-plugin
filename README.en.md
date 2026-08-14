@@ -8,13 +8,17 @@ An undo/rollback system for [DeepSeek Harness (DSH)](https://github.com/deepseek
 
 ## Preview
 
-| Header buttons (Undo / Redo / Snapshots) | Settings: shortcuts & snapshot options |
+| Header buttons (Undo / Redo / Snapshots) | Snapshot manager panel (diff / restore / delete / clean-up / export / import) |
 |---|---|
 | ![1](docs/1.png) | ![2](docs/2.png) |
 
-| Snapshot manager panel (restore to any version) | Offline GUI (DSH Undo Manager) |
+| Settings: shortcuts & snapshot options | Offline GUI (DSH Undo Manager) |
 |---|---|
 | ![3](docs/3.png) | ![4](docs/4.png) |
+
+| One-click export of all snapshots (backup / migration) |
+|---|
+| ![5](docs/5.png) |
 
 ## Features
 
@@ -26,8 +30,10 @@ An undo/rollback system for [DeepSeek Harness (DSH)](https://github.com/deepseek
 | **Dual save modes** | **Manual saves** (never auto-pruned) + **auto saves** (debounced 1.5 s snapshot on config change, keeps latest 20); **the two modes have separate storage locations** |
 | **Configurable options** | Settings → General → Snapshot Settings: auto-save toggle, debounce ms, auto snapshots kept, **pre-restore snapshots kept, auto-cleanup toggle**, manual/auto snapshot directories, applied immediately |
 | **Auto-cleanup** | Excess snapshots are deleted automatically: auto keeps N, pre-restore keeps M (consumed first); manual snapshots are never deleted; disable it in settings to keep everything; "Clean up" in the panel prunes manually |
-| **Chat commands** | Just tell the AI "undo the last step / roll back / redo / save a snapshot / list snapshots" — tools are called automatically |
+| **Chat commands** | Just tell the AI "undo the last step / roll back / redo / save a snapshot / list snapshots" — tools are called automatically; after a config change the AI proactively mentions "auto-saved, you can undo anytime" |
 | **Undo/redo stack** | Multiple consecutive undos; redo re-applies the pre-undo state (blocked when newer changes exist); every restore first preserves the current state as a "pre-restore" snapshot |
+| **Crash self-check** | Detects when the previous DSH run crashed before finishing startup, warns in the snapshot list and panel, and suggests rolling back to the last good state |
+| **Export / import** | One-click ZIP export of all snapshots (backup / moving machines); import restores into the right store by kind and skips duplicates; panel buttons, chat tools and offline CLI all supported |
 | **Offline tools** | CLI (`snapshot/undo/redo/restore/remove/list/diff/prune/status`) + **GUI window** (desktop shortcut) + safe plugin-install wrapper |
 
 ## What is snapshotted & where
