@@ -26,7 +26,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-. (Join-Path $PSScriptRoot 'dsh-undo-lib.ps1')
+. (Join-Path $PSScriptRoot 'dsh-undo-savepoint-lib.ps1')
 
 switch ($Command) {
     'snapshot' {

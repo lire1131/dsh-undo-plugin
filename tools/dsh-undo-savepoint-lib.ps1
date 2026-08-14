@@ -329,3 +329,44 @@ function Import-UndoSnapshots([string]$ZipPath) {
         Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
     }
 }
+
+function Get-UndoBootAlert {
+    $settings = Get-UndoSettings
+    return (Test-Path -LiteralPath (Join-Path $settings.autoDir '.booting'))
+}
+
+function Set-UndoSettings([hashtable]$New) {
+    $current = Get-UndoSettings
+    foreach ($k in $New.Keys) {
+        if ($null -ne $New[$k]) { $current[$k] = $New[$k] }
+    }
+    New-Item -ItemType Directory -Force -Path (Split-Path $script:UndoSettingsFile -Parent) | Out-Null
+    $json = $current | ConvertTo-Json -Depth 5
+    [System.IO.File]::WriteAllText($script:UndoSettingsFile, $json, (New-Object System.Text.UTF8Encoding($false)))
+    return $current
+}
+
+function Get-UndoDiffText([string]$Id) {
+    $target = if ($Id -eq 'latest') { @(Get-UndoSnapshots)[0] } else { Get-UndoSnapshotById $Id }
+    if ($null -eq $target) { return "Snapshot not found: $Id" }
+    $sb = New-Object System.Text.StringBuilder
+    foreach ($f in $script:UndoFileSpecs) {
+        $snapPath = Join-Path $target._Dir (Get-UndoDestName $f)
+        $curPath = Join-Path $f.Root $f.Name
+        $hasSnap = Test-Path -LiteralPath $snapPath
+        $hasCur = Test-Path -LiteralPath $curPath
+        if (-not $hasSnap -and -not $hasCur) { continue }
+        if ($hasSnap -and -not $hasCur) { [void]$sb.AppendLine("$((Get-UndoDestName $f)): file did not exist at snapshot time"); continue }
+        if (-not $hasSnap -and $hasCur) { [void]$sb.AppendLine("$((Get-UndoDestName $f)): NEW file (absent in snapshot)"); continue }
+        $a = @(Get-Content -LiteralPath $snapPath)
+        $b = @(Get-Content -LiteralPath $curPath)
+        $onlyA = @($a | Where-Object { $_ -notin $b })
+        $onlyB = @($b | Where-Object { $_ -notin $a })
+        if (@($onlyA).Count -eq 0 -and @($onlyB).Count -eq 0) { continue }
+        [void]$sb.AppendLine("$((Get-UndoDestName $f)): +$(@($onlyB).Count) -$(@($onlyA).Count)")
+        foreach ($l in ($onlyA | Select-Object -First 20)) { [void]$sb.AppendLine("  - $l") }
+        foreach ($l in ($onlyB | Select-Object -First 20)) { [void]$sb.AppendLine("  + $l") }
+    }
+    if ($sb.Length -eq 0) { return '(no differences)' }
+    return $sb.ToString()
+}
