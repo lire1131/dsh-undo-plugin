@@ -1,4 +1,32 @@
+# dependencies
 node_modules/
+
+# snapshot data — NEVER commit: snapshots are copies of config files
+# (settings.yaml, .env) and may contain API keys / secrets
 snapshots/
+*.snapshots/
+
+# secrets
+.env
+.env.*
+
+# logs
 *.log
-.undo-tmp
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# temp files
+*.undo-tmp
+*.tmp
+
+# OS files
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# editors / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
