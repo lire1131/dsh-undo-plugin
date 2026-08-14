@@ -1,0 +1,25 @@
+{
+  "name": "dsh-undo",
+  "version": "0.1.0",
+  "description": "DSH undo/rollback system: snapshot config files on change, undo/redo the last action from the WebUI or by chat, and roll back broken plugin trees without reinstalling. Local-only plugin.",
+  "private": true,
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json"
+  },
+  "engines": {
+    "dsh": ">=0.0.1",
+    "node": ">=20.0.0"
+  },
+  "dsh": {
+    "client": {
+      "platform": "web",
+      "inject": ["slots", "locale"]
+    }
+  },
+  "files": ["lib", "tools"],
+  "license": "MIT"
+}
