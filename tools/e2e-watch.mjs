@@ -28,7 +28,7 @@ const ctx = {
   effect: (fn) => { const d = fn(); return d ?? (() => { }); },
   logger: { info: () => { }, warn: (...a) => console.warn('[warn]', ...a) },
 };
-apply(ctx, { snapshotDir: snapDir, homeDir: home, profileDir: profile, watch: true, watchDebounceMs: 300, keepAuto: 10 });
+apply(ctx, { manualDir: join(snapDir, 'manual'), autoDir: join(snapDir, 'auto'), homeDir: home, profileDir: profile, watch: true, watchDebounceMs: 300, keepAuto: 10 });
 await sleep(600); // baseline lands
 
 let pass = 0, fail = 0;

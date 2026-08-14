@@ -23,9 +23,9 @@ const ctx = {
   effect: (fn) => { const d = fn(); return d ?? (() => { }); },
   logger: { info: () => { }, warn: (...a) => console.warn('[warn]', ...a) },
 };
-apply(ctx, { snapshotDir: snapDir, homeDir: home, profileDir: profile, watch: false, keepAuto: 2 });
+apply(ctx, { manualDir: join(snapDir, 'manual'), autoDir: join(snapDir, 'auto'), homeDir: home, profileDir: profile, watch: false, keepAuto: 2 });
 // let the async baseline snapshot land before we start asserting
-await new Promise((r) => setTimeout(r, 150));
+await new Promise((r) => setTimeout(r, 300));
 
 let pass = 0, fail = 0;
 const check = (cond, label) => { if (cond) { pass++; console.log('  ok  -', label); } else { fail++; console.error('  FAIL -', label); } };
@@ -40,16 +40,17 @@ const set = async (f, v) => writeFile(join(profile, f), v);
 console.log('== 1. snapshot & list ==');
 let out = await run('undo_snapshot', { reason: 'known-good' });
 console.log('   ', out.split('\n')[0]);
-check((await readdir(snapDir)).length >= 2, 'baseline + manual snapshot dirs exist');
+check((await readdir(snapDir)).sort().join(',') === 'auto,manual', 'manual/auto stores exist');
+check((await readdir(join(snapDir, 'manual'))).length >= 1, 'manual store has the manual snapshot');
 out = await run('undo_list', {});
 check(out.includes('known-good'), 'list shows reason');
 check(out.includes('plugin-mounted'), 'list shows baseline');
+check(out.includes('[manual]') && out.includes('[auto]'), 'list shows store locations');
 
 console.log('== 2. change config, snapshot again ==');
 await set('cordis.patch.yml', '# patch\n- id: test\n  name: test\n');
 await set('package.json', '{"name":"test","v":2}\n');
 out = await run('undo_snapshot', { reason: 'after change' });
-const id2 = out.match(/Snapshot (\S+) created/)[1];
 
 console.log('== 3. undo steps back to known-good ==');
 out = await run('undo_restore', { mode: 'undo' });
@@ -97,22 +98,24 @@ check((await cur('package.json')).includes('"v":5'), 'undo after full redo -> v5
 
 console.log('== 8. restore by id ==');
 const list = await run('undo_list', {});
-const line = list.split('\n').find((l) => /manual\s+known-good\s+\(/.test(l));
+const line = list.split('\n').find((l) => /known-good\s+\(/.test(l));
 const id1 = line?.match(/^(\S+)/)?.[1];
 check(!!id1, 'found known-good id');
 out = await run('undo_restore', { mode: 'id', snapshot_id: id1 });
 check((await cur('package.json')).includes('"v":1'), 'restore by id -> v1');
 
-console.log('== 9. baseline/auto prune (keepAuto=2) ==');
-for (let i = 0; i < 5; i++) {
-  await set('package.json', `{"name":"test","v":${10 + i}}\n`);
-  await run('undo_snapshot', { reason: 'auto-like' });
-}
-// simulate auto kinds by editing manifests? simpler: create auto snapshots via internal path not exposed.
-// Instead: check manual snapshots are NOT pruned by count.
-const all = await readdir(snapDir);
-console.log('   snapshot dirs:', all.length);
-check(all.length >= 8, 'manual snapshots survive');
+console.log('== 9. manual snapshots survive (never pruned) ==');
+const countSnaps = async () => (await readdir(join(snapDir, 'manual'))).length + (await readdir(join(snapDir, 'auto'))).length;
+const all = await countSnaps();
+console.log('   snapshot count:', all);
+check(all >= 8, 'manual snapshots survive');
+
+console.log('== 9b. manual vs auto stores are separate ==');
+const manualBefore = (await readdir(join(snapDir, 'manual'))).length;
+const autoBefore = (await readdir(join(snapDir, 'auto'))).length;
+await run('undo_snapshot', { reason: 'store-check' });
+check((await readdir(join(snapDir, 'manual'))).length === manualBefore + 1, 'manual snapshot goes to the manual store');
+check((await readdir(join(snapDir, 'auto'))).length === autoBefore, 'auto store untouched by manual snapshot');
 
 console.log('== 10. diff works ==');
 out = await run('undo_diff', { snapshot_id: id1 });
@@ -135,8 +138,8 @@ const ctx2 = {
   effect: (fn) => { const d = fn(); return d ?? (() => { }); },
   logger: { info: () => { }, warn: () => { } },
 };
-apply(ctx2, { snapshotDir: snap2, homeDir: home2, profileDir: profile2, watch: false });
-await new Promise((r) => setTimeout(r, 150));
+apply(ctx2, { manualDir: join(snap2, 'manual'), autoDir: join(snap2, 'auto'), homeDir: home2, profileDir: profile2, watch: false });
+await new Promise((r) => setTimeout(r, 300));
 const run2 = async (name, args) => (await tools2.get(name).execute(args, {}));
 await run2('undo_snapshot', { reason: 'dup-a' });
 await run2('undo_snapshot', { reason: 'dup-b' });
