@@ -93,6 +93,8 @@ mklink /J "<your-dsh-install>\node_modules\dsh-undo" "D:\dsh\plugins\dsh-undo"
 
 ### Offline tools (works even when DSH won't boot)
 
+> GUI language: the manager window follows the system UI language (zh/en); force it with `DSH_UNDO_LANG=zh|en`.
+
 From the repository directory:
 
 ```powershell

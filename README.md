@@ -95,6 +95,8 @@ mklink /J "<你的DSH安装>\node_modules\dsh-undo" "D:\dsh\plugins\dsh-undo"
 
 ### 局外工具(DSH 挂了也能用)
 
+> 界面语言:程序窗口按系统 UI 语言自动显示中文/英文;可用环境变量 `DSH_UNDO_LANG=zh|en` 强制指定。
+
 进入仓库目录后:
 
 ```powershell
