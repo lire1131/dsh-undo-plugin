@@ -38,7 +38,7 @@ const run = async (name, args) => (await tools.get(name).execute(args, {}));
 const curSettings = async () => readFile(join(home, 'settings.yaml'), 'utf8');
 const autoCount = async () => {
   const out = await run('undo_list', {});
-  return (out.match(/config-change/g) || []).length;
+  return (out.match(/(config|settings|plugin|patch)-change/g) || []).length;
 };
 
 console.log('== 1. config change auto-snapshots ==');

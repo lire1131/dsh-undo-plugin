@@ -21,10 +21,11 @@ An undo/rollback system for [DeepSeek Harness (DSH)](https://github.com/deepseek
 | Entry | Capability |
 |---|---|
 | **WebUI header buttons** | Red **Undo**, green **Redo** and **Snapshots** buttons, visible in every session |
-| **Snapshot manager panel** | Visual list (time / type / reason / file count / store), **restore to any snapshot version**, **delete snapshots**, manual save, refresh |
+| **Snapshot manager panel** | Visual list (time / type / reason / file count / store), **per-row diff preview** (added/removed lines), **restore to any snapshot version** (confirmation shows a change summary first), **delete snapshots**, manual save, clean-up, refresh |
 | **Keyboard shortcuts** | Default **Ctrl+Alt+Z** (undo) / **Ctrl+Alt+Y** (redo), customizable in Settings → General |
 | **Dual save modes** | **Manual saves** (never auto-pruned) + **auto saves** (debounced 1.5 s snapshot on config change, keeps latest 20); **the two modes have separate storage locations** |
-| **Configurable options** | Settings → General → Snapshot Settings: auto-save toggle, debounce ms, auto snapshots kept, manual/auto snapshot directories, applied immediately |
+| **Configurable options** | Settings → General → Snapshot Settings: auto-save toggle, debounce ms, auto snapshots kept, **pre-restore snapshots kept, auto-cleanup toggle**, manual/auto snapshot directories, applied immediately |
+| **Auto-cleanup** | Excess snapshots are deleted automatically: auto keeps N, pre-restore keeps M (consumed first); manual snapshots are never deleted; disable it in settings to keep everything; "Clean up" in the panel prunes manually |
 | **Chat commands** | Just tell the AI "undo the last step / roll back / redo / save a snapshot / list snapshots" — tools are called automatically |
 | **Undo/redo stack** | Multiple consecutive undos; redo re-applies the pre-undo state (blocked when newer changes exist); every restore first preserves the current state as a "pre-restore" snapshot |
 | **Offline tools** | CLI (`snapshot/undo/redo/restore/remove/list/diff/prune/status`) + **GUI window** (desktop shortcut) + safe plugin-install wrapper |

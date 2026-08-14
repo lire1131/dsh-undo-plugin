@@ -1,0 +1,24 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [20, 22]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+      - name: Install peer dependency for tests
+        run: npm install --no-save @deepseek-ai/dsh-tools
+      - name: Smoke tests
+        run: node tools/smoke-test.mjs
+      - name: Watcher e2e regression
+        run: node tools/e2e-watch.mjs

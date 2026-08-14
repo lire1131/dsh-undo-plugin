@@ -199,13 +199,30 @@ function Ensure-UndoMount {
     return $true
 }
 
-function Invoke-UndoPrune([int]$KeepAuto) {
-    $list = Get-UndoSnapshots | Where-Object { ($_.kind -eq 'auto' -or $_.kind -eq 'baseline') -and $_.location -eq 'auto' } | Sort-Object -Property time
-    $excess = @($list | Select-Object -First ([Math]::Max(0, @($list).Count - $KeepAuto)))
-    foreach ($s in $excess) {
+function Invoke-UndoPrune {
+    $settings = Get-UndoSettings
+    if ($settings.autoCleanup -eq $false) { return @{ removedAuto = 0; removedPre = 0; disabled = $true } }
+    $keepAuto = if ($settings.keepAuto) { [int]$settings.keepAuto } else { 20 }
+    $keepPre = if ($null -ne $settings.keepPre) { [int]$settings.keepPre } else { 10 }
+    $list = Get-UndoSnapshots
+    $removedAuto = 0
+    $removedPre = 0
+    # auto/baseline beyond keepAuto (only the auto store; manual never touched)
+    $auto = @($list | Where-Object { ($_.kind -eq 'auto' -or $_.kind -eq 'baseline') -and $_._Store -eq 'auto' } | Sort-Object -Property time)
+    $excessAuto = @($auto | Select-Object -First ([Math]::Max(0, $auto.Count - $keepAuto)))
+    foreach ($s in $excessAuto) {
         Remove-Item -LiteralPath $s._Dir -Recurse -Force -ErrorAction SilentlyContinue
+        $removedAuto++
     }
-    return @($excess).Count
+    # pre-restore beyond keepPre (consumed ones first, then oldest)
+    $pre = @($list | Where-Object { $_.kind -eq 'pre-restore' -and $_._Store -eq 'auto' } |
+        Sort-Object @{ Expression = { if ($_.consumed) { 0 } else { 1 } } }, time)
+    $excessPre = @($pre | Select-Object -First ([Math]::Max(0, $pre.Count - $keepPre)))
+    foreach ($s in $excessPre) {
+        Remove-Item -LiteralPath $s._Dir -Recurse -Force -ErrorAction SilentlyContinue
+        $removedPre++
+    }
+    return @{ removedAuto = $removedAuto; removedPre = $removedPre }
 }
 
 function Invoke-UndoRestore([string]$Mode, [string]$Id) {

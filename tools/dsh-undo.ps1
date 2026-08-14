@@ -101,8 +101,9 @@ switch ($Command) {
         Write-Host "Removed snapshot $($r.removed)"
     }
     'prune' {
-        $n = Invoke-UndoPrune $KeepAuto
-        Write-Host "Pruned $n snapshot(s); kept $KeepAuto auto/baseline."
+        $r = Invoke-UndoPrune
+        if ($r.disabled) { Write-Host 'Auto-cleanup is disabled in settings - nothing deleted.'; break }
+        Write-Host "Pruned $($r.removedAuto) auto/baseline and $($r.removedPre) pre-restore snapshot(s)."
     }
     'status' {
         $settings = Get-UndoSettings
