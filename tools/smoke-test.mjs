@@ -1,9 +1,10 @@
 // tools/smoke-test.mjs — offline smoke test of dsh-undo logic (no DSH needed).
 // Run:  node tools/smoke-test.mjs
+process.env.DSH_ROOT = process.env.DSH_ROOT ?? 'C:/Users/yzf';
+const { apply } = await import('../lib/index.js');
 import { mkdtemp, writeFile, readFile, mkdir, rm, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { apply } from '../lib/index.js';
 
 const root = await mkdtemp(join(tmpdir(), 'dsh-undo-test-'));
 const home = join(root, 'home');

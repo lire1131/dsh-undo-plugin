@@ -48,7 +48,7 @@ Prerequisites: DSH (`@deepseek-ai/dsh`) and Node.js (≥20).
 **Option A (recommended, ecosystem standard)** — this plugin declares a `dsh.bundle` manifest, so install it with the official plugin command:
 
 ```bat
-dsh plugin --profile web add github:lire1131/dsh-undo-plugin#main
+dsh plugin --profile web add github:lire1131/dsh-undo-plugin#master
 ```
 
 Restart DSH after installing. Snapshot directories and options are configurable in Settings.

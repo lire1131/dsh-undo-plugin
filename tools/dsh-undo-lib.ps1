@@ -3,15 +3,15 @@
 # Works WITHOUT DSH running: reads/writes the same snapshot stores and the
 # same manifest format as the dsh-undo DSH plugin.
 #
-# Store layout (mirrors lib/index.js):
-#   manual snapshots -> <root>\manual ; auto/baseline/pre-restore -> <root>\auto
-#   legacy flat snapshots under <root> are read too.
+# Store layout (mirrors lib/index.js): defaults are based on the user home
+# directory (no hardcoded author paths — see issue #1); values stored in the
+# settings file take precedence via Get-UndoSettings.
 
-$script:UndoSnapshotRoot = 'D:\dsh\undo-snapshots'
+$script:UndoSnapshotRoot = Join-Path $env:USERPROFILE '.dsh\undo-snapshots'
 $script:UndoLegacyRoot = $script:UndoSnapshotRoot
 $script:UndoManualDir = Join-Path $script:UndoSnapshotRoot 'manual'
 $script:UndoAutoDir = Join-Path $script:UndoSnapshotRoot 'auto'
-$script:UndoHome = 'D:\dsh\undo'
+$script:UndoHome = Join-Path $env:USERPROFILE '.dsh\undo'
 $script:UndoSettingsFile = Join-Path $script:UndoHome 'settings.json'
 $script:UndoHomeRoot = Join-Path $env:USERPROFILE '.dsh'
 $script:UndoProfileRoot = Join-Path $script:UndoHomeRoot 'profiles\web'

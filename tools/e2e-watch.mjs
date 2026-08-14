@@ -4,10 +4,11 @@
 //   2. undo restores and does NOT trigger its own auto snapshot (suppression)
 //   3. redo then succeeds (would have been blocked before the fix)
 // Run:  node tools/e2e-watch.mjs
+process.env.DSH_ROOT = process.env.DSH_ROOT ?? 'C:/Users/yzf';
+const { apply } = await import('../lib/index.js');
 import { mkdtemp, writeFile, readFile, mkdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { apply } from '../lib/index.js';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
