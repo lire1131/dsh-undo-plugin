@@ -270,3 +270,62 @@ function Remove-UndoSnapshot([string]$Id) {
     Remove-Item -LiteralPath $snap._Dir -Recurse -Force
     return @{ ok = $true; removed = $Id }
 }
+
+function Export-UndoSnapshots {
+    $settings = Get-UndoSettings
+    $exportRoot = Join-Path (Split-Path $settings.autoDir -Parent) 'undo-exports'
+    New-Item -ItemType Directory -Force -Path $exportRoot | Out-Null
+    $ts = Get-Date -Format 'yyyyMMdd-HHmmss'
+    $tmp = Join-Path $exportRoot "tmp-$ts"
+    New-Item -ItemType Directory -Force -Path $tmp | Out-Null
+    $zip = Join-Path $exportRoot "dsh-undo-export-$ts.zip"
+    $count = 0
+    try {
+        foreach ($pair in @(@('manual', $settings.manualDir), @('auto', $settings.autoDir))) {
+            $label = $pair[0]
+            $base = $pair[1]
+            if (-not (Test-Path -LiteralPath $base)) { continue }
+            foreach ($d in Get-ChildItem -LiteralPath $base -Directory -Force -ErrorAction SilentlyContinue) {
+                if (-not (Test-Path -LiteralPath (Join-Path $d.FullName 'manifest.json'))) { continue }
+                $dest = Join-Path $tmp $label
+                New-Item -ItemType Directory -Force -Path $dest | Out-Null
+                Copy-Item -LiteralPath $d.FullName -Destination $dest -Recurse -Force
+                $count++
+            }
+        }
+        Compress-Archive -Path (Join-Path $tmp '*') -DestinationPath $zip -Force
+        return @{ ok = $true; path = $zip; count = $count }
+    } catch {
+        return @{ ok = $false; error = $_.Exception.Message }
+    } finally {
+        Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
+function Import-UndoSnapshots([string]$ZipPath) {
+    $settings = Get-UndoSettings
+    if (-not (Test-Path -LiteralPath $ZipPath)) { return @{ ok = $false; error = "file not found: $ZipPath" } }
+    $exportRoot = Join-Path (Split-Path $settings.autoDir -Parent) 'undo-exports'
+    New-Item -ItemType Directory -Force -Path $exportRoot | Out-Null
+    $ts = Get-Date -Format 'yyyyMMdd-HHmmss'
+    $tmp = Join-Path $exportRoot "imp-$ts"
+    New-Item -ItemType Directory -Force -Path $tmp | Out-Null
+    $imported = 0
+    $skipped = 0
+    try {
+        Expand-Archive -Path $ZipPath -DestinationPath $tmp -Force
+        $snapDirs = Get-ChildItem -LiteralPath $tmp -Recurse -Directory -Force | Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName 'manifest.json') }
+        foreach ($d in $snapDirs) {
+            try { $kind = (Get-Content -LiteralPath (Join-Path $d.FullName 'manifest.json') -Raw -Encoding UTF8 | ConvertFrom-Json).kind } catch { $kind = 'auto' }
+            $dest = if ($kind -eq 'manual') { $settings.manualDir } else { $settings.autoDir }
+            if (Test-Path -LiteralPath (Join-Path $dest $d.Name)) { $skipped++; continue }
+            Copy-Item -LiteralPath $d.FullName -Destination $dest -Recurse -Force
+            $imported++
+        }
+        return @{ ok = $true; imported = $imported; skipped = $skipped; source = $ZipPath }
+    } catch {
+        return @{ ok = $false; error = $_.Exception.Message }
+    } finally {
+        Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}

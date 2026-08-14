@@ -17,7 +17,7 @@
 
 param(
     [Parameter(Position = 0)]
-    [ValidateSet('snapshot', 'list', 'diff', 'restore', 'undo', 'redo', 'remove', 'prune', 'status', 'settings')]
+    [ValidateSet('snapshot', 'list', 'diff', 'restore', 'undo', 'redo', 'remove', 'prune', 'export', 'import', 'status', 'settings')]
     [string]$Command = 'status',
     [string]$Label = '',
     [string]$Id = '',
@@ -104,6 +104,17 @@ switch ($Command) {
         $r = Invoke-UndoPrune
         if ($r.disabled) { Write-Host 'Auto-cleanup is disabled in settings - nothing deleted.'; break }
         Write-Host "Pruned $($r.removedAuto) auto/baseline and $($r.removedPre) pre-restore snapshot(s)."
+    }
+    'export' {
+        $r = Export-UndoSnapshots
+        if (-not $r.ok) { Write-Host "export failed: $($r.error)"; exit 1 }
+        Write-Host "Exported $($r.count) snapshot(s) to $($r.path)"
+    }
+    'import' {
+        if ([string]::IsNullOrEmpty($Id)) { throw 'import requires -Id <zip-path>' }
+        $r = Import-UndoSnapshots $Id
+        if (-not $r.ok) { Write-Host "import failed: $($r.error)"; exit 1 }
+        Write-Host "Imported $($r.imported) snapshot(s) ($($r.skipped) duplicate(s) skipped) from $($r.source)"
     }
     'status' {
         $settings = Get-UndoSettings

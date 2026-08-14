@@ -209,6 +209,27 @@ out = await run4('undo_list', {});
 check((out.match(/pre-restore/g) || []).length === 1, 'pre-restore kept when autoCleanup off');
 await rm(root4, { recursive: true, force: true });
 
+console.log('== 13. crash self-check: leftover .booting marker -> boot alert ==');
+const root5 = await mkdtemp(join(tmpdir(), 'dsh-undo-test5-'));
+const home5 = join(root5, 'home'), profile5 = join(root5, 'profile'), snap5 = join(root5, 'snaps');
+await mkdir(home5, { recursive: true }); await mkdir(profile5, { recursive: true });
+await mkdir(join(snap5, 'auto'), { recursive: true });
+await writeFile(join(snap5, 'auto', '.booting'), 'stale marker from a crashed run\n'); // simulate crash
+await writeFile(join(home5, 'settings.yaml'), 'model: x\n');
+await writeFile(join(profile5, 'cordis.patch.yml'), '# patch\n[]\n');
+const tools5 = new Map();
+const ctx5 = {
+  tools: { register: (t) => { tools5.set(t.name, t); return () => { }; } },
+  systemPrompt: { section: () => () => { } }, get: () => undefined,
+  effect: (fn) => { const d = fn(); return d ?? (() => { }); }, logger: { info: () => { }, warn: () => { } },
+};
+apply(ctx5, { manualDir: join(snap5, 'manual'), autoDir: join(snap5, 'auto'), homeDir: home5, profileDir: profile5, watch: false });
+await new Promise((r) => setTimeout(r, 300));
+const run5 = async (name, args) => (await tools5.get(name).execute(args, {}));
+out = await run5('undo_list', {});
+check(out.includes('did not finish starting'), 'boot alert shown in undo_list after simulated crash');
+await rm(root5, { recursive: true, force: true });
+
 await rm(root, { recursive: true, force: true });
 console.log(`\n== RESULT: ${pass} passed, ${fail} failed ==`);
 process.exit(fail > 0 ? 1 : 0);
