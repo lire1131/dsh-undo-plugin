@@ -1,4 +1,4 @@
-// tools/smoke-test.mjs — offline smoke test of dsh-undo logic (no DSH needed).
+// tools/smoke-test.mjs — offline smoke test of dsh-undo-savepoint logic (no DSH needed).
 // Run:  node tools/smoke-test.mjs
 process.env.DSH_ROOT = process.env.DSH_ROOT ?? 'C:/Users/yzf';
 const { apply } = await import('../lib/index.js');
@@ -6,7 +6,7 @@ import { mkdtemp, writeFile, readFile, mkdir, rm, readdir } from 'node:fs/promis
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
-const root = await mkdtemp(join(tmpdir(), 'dsh-undo-test-'));
+const root = await mkdtemp(join(tmpdir(), 'dsh-undo-savepoint-test-'));
 const home = join(root, 'home');
 const profile = join(root, 'profile');
 const snapDir = join(root, 'snapshots');
@@ -59,7 +59,7 @@ console.log('   ', out.split('\n')[0]);
 check((await cur('package.json')).includes('"v":1'), 'package.json back to v1');
 check(!(await cur('cordis.patch.yml')).includes('- id: test'), 'patch entry removed');
 check((await cur('cordis.patch.yml')).includes('- insert:'), 'undo mount is an insert patch');
-check((await cur('cordis.patch.yml')).includes('name: dsh-undo'), 'undo mount has package name');
+check((await cur('cordis.patch.yml')).includes('name: dsh-undo-savepoint'), 'undo mount has package name');
 check(out.includes('re-ensured'), 'report mentions re-ensure');
 
 console.log('== 4. redo re-applies the change ==');
@@ -123,7 +123,7 @@ out = await run('undo_diff', { snapshot_id: id1 });
 check(out.includes('Diff of'), 'diff produced');
 
 console.log('== 11. undo with all-identical snapshots says unchanged ==');
-const root2 = await mkdtemp(join(tmpdir(), 'dsh-undo-test2-'));
+const root2 = await mkdtemp(join(tmpdir(), 'dsh-undo-savepoint-test2-'));
 const home2 = join(root2, 'home');
 const profile2 = join(root2, 'profile');
 const snap2 = join(root2, 'snapshots');
@@ -154,7 +154,7 @@ await rm(root2, { recursive: true, force: true });
 
 console.log('== 12. prune: pre-restore cleanup + autoCleanup off ==');
 // fixture 3: keepPre=1, autoCleanup on
-const root3 = await mkdtemp(join(tmpdir(), 'dsh-undo-test3-'));
+const root3 = await mkdtemp(join(tmpdir(), 'dsh-undo-savepoint-test3-'));
 const home3 = join(root3, 'home'), profile3 = join(root3, 'profile'), snap3 = join(root3, 'snaps');
 await mkdir(home3, { recursive: true }); await mkdir(profile3, { recursive: true });
 await writeFile(join(home3, 'settings.yaml'), 'model: x\n');
@@ -185,7 +185,7 @@ check((out.match(/pre-restore/g) || []).length === 1, 'exactly 1 pre-restore lef
 await rm(root3, { recursive: true, force: true });
 
 // fixture 4: autoCleanup=false -> prune deletes nothing
-const root4 = await mkdtemp(join(tmpdir(), 'dsh-undo-test4-'));
+const root4 = await mkdtemp(join(tmpdir(), 'dsh-undo-savepoint-test4-'));
 const home4 = join(root4, 'home'), profile4 = join(root4, 'profile'), snap4 = join(root4, 'snaps');
 await mkdir(home4, { recursive: true }); await mkdir(profile4, { recursive: true });
 await writeFile(join(home4, 'settings.yaml'), 'model: x\n');

@@ -1,7 +1,7 @@
-# dsh-undo-lib.ps1 - shared logic for the dsh-undo external tooling.
-# Dot-source this from dsh-undo.ps1 (CLI) and dsh-undo-gui.ps1 (window).
+# dsh-undo-savepoint-lib.ps1 - shared logic for the dsh-undo-savepoint external tooling.
+# Dot-source this from dsh-undo-savepoint.ps1 (CLI) and dsh-undo-savepoint-gui.ps1 (window).
 # Works WITHOUT DSH running: reads/writes the same snapshot stores and the
-# same manifest format as the dsh-undo DSH plugin.
+# same manifest format as the dsh-undo-savepoint DSH plugin.
 #
 # Store layout (mirrors lib/index.js): defaults are based on the user home
 # directory (no hardcoded author paths — see issue #1); values stored in the
@@ -16,7 +16,7 @@ $script:UndoSettingsFile = Join-Path $script:UndoHome 'settings.json'
 $script:UndoHomeRoot = Join-Path $env:USERPROFILE '.dsh'
 $script:UndoProfileRoot = Join-Path $script:UndoHomeRoot 'profiles\web'
 
-# Must mirror FILE_SPECS in the dsh-undo plugin (lib/index.js).
+# Must mirror FILE_SPECS in the dsh-undo-savepoint plugin (lib/index.js).
 $script:UndoFileSpecs = @(
     @{ RootKey = 'profile'; Root = $script:UndoProfileRoot; Name = 'cordis.patch.yml' },
     @{ RootKey = 'profile'; Root = $script:UndoProfileRoot; Name = 'package.json' },
@@ -192,9 +192,9 @@ function Ensure-UndoMount {
     $patch = Join-Path $script:UndoProfileRoot 'cordis.patch.yml'
     if (-not (Test-Path -LiteralPath $patch)) { return $false }
     $content = [System.IO.File]::ReadAllText($patch)
-    if ($content -match 'dsh-undo') { return $false }
+    if ($content -match 'dsh-undo-savepoint') { return $false }
     $content = $content -replace '(?m)^\s*\[\]\s*$', ''
-    $block = "`n# dsh-undo mount (re-ensured by dsh-undo)`n- insert:`n    - id: dsh-undo`n      name: dsh-undo`n"
+    $block = "`n# dsh-undo-savepoint mount (re-ensured by dsh-undo-savepoint)`n- insert:`n    - id: dsh-undo-savepoint`n      name: dsh-undo-savepoint`n"
     [System.IO.File]::WriteAllText($patch, ($content.TrimEnd() + $block), (New-Object System.Text.UTF8Encoding($false)))
     return $true
 }

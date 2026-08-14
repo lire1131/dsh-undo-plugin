@@ -1,4 +1,4 @@
-# dsh-undo — DSH 撤销/回退系统
+# dsh-undo-savepoint — DSH 撤销/回退系统
 
 [![awesome · DSH plugin](https://awesome-dsh-plugin.com/badge.svg)](https://awesome-dsh-plugin.com)
 
@@ -51,23 +51,23 @@
 **方式 A(推荐,生态标准一条命令)** — 本插件已声明 `dsh.bundle` manifest,可直接用官方插件命令安装:
 
 ```bat
-dsh plugin --profile web add github:lire1131/dsh-undo-plugin#master
+dsh plugin --profile web add github:lire1131/dsh-undo-savepoint-plugin#master
 ```
 
 安装完成后重启 DSH 即生效(快照目录、参数等均可在设置中修改)。
 
 **方式 B(本地源码/免发布)** — clone 到本地目录并手工挂载:
 
-1. **把仓库放到本地插件目录**(无中文路径更稳妥),例如 `D:\dsh\plugins\dsh-undo`:
+1. **把仓库放到本地插件目录**(无中文路径更稳妥),例如 `D:\dsh\plugins\dsh-undo-savepoint`:
 
 ```bat
-git clone https://github.com/lire1131/dsh-undo-plugin.git D:\dsh\plugins\dsh-undo
+git clone https://github.com/lire1131/dsh-undo-savepoint-plugin.git D:\dsh\plugins\dsh-undo-savepoint
 ```
 
-2. **建立 junction**,让 DSH 的模块解析器通过包名 `dsh-undo` 找到本地源码(host 插件与 WebUI client 插件都靠它):
+2. **建立 junction**,让 DSH 的模块解析器通过包名 `dsh-undo-savepoint` 找到本地源码(host 插件与 WebUI client 插件都靠它):
 
 ```bat
-mklink /J "<你的DSH安装>\node_modules\dsh-undo" "D:\dsh\plugins\dsh-undo"
+mklink /J "<你的DSH安装>\node_modules\dsh-undo-savepoint" "D:\dsh\plugins\dsh-undo-savepoint"
 ```
 
 > 说明:DSH 从它自己的 `node_modules` 向上解析包名。默认安装位置是 `C:\Users\<用户名>\node_modules`(npm 安装在用户目录时);若用 npx 缓存运行,则对 npx 缓存目录下的 `node_modules` 建 junction。执行 `npm root -g` / 检查 DSH 启动报错路径即可确认。
@@ -76,8 +76,8 @@ mklink /J "<你的DSH安装>\node_modules\dsh-undo" "D:\dsh\plugins\dsh-undo"
 
 ```yaml
 - insert:
-    - id: dsh-undo
-      name: dsh-undo
+    - id: dsh-undo-savepoint
+      name: dsh-undo-savepoint
 ```
 
 4. **生效**:保存即热加载(host 部分);刷新页面出现头部按钮与设置项;重启 DSH 后一切进入稳态(旧版扁平快照会自动迁移)。
@@ -101,17 +101,17 @@ mklink /J "<你的DSH安装>\node_modules\dsh-undo" "D:\dsh\plugins\dsh-undo"
 进入仓库目录后:
 
 ```powershell
-# 程序窗口(推荐):双击 tools\dsh-undo-gui.bat,或:
-powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-undo-gui.ps1"
+# 程序窗口(推荐):双击 tools\dsh-undo-savepoint-gui.bat,或:
+powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-undo-savepoint-gui.ps1"
 
 # 命令行
-powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-undo.ps1" list
-powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-undo.ps1" snapshot -Label "原因"
-powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-undo.ps1" undo
-powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-undo.ps1" redo
-powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-undo.ps1" restore -Id <id> -Force
-powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-undo.ps1" remove -Id <id>
-powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-undo.ps1" prune -KeepAuto 20
+powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-undo-savepoint.ps1" list
+powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-undo-savepoint.ps1" snapshot -Label "原因"
+powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-undo-savepoint.ps1" undo
+powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-undo-savepoint.ps1" redo
+powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-undo-savepoint.ps1" restore -Id <id> -Force
+powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-undo-savepoint.ps1" remove -Id <id>
+powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-undo-savepoint.ps1" prune -KeepAuto 20
 
 # 安全装插件(自动前后存档,失败自动回退)
 powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-plugin.ps1" add <包名>
@@ -136,7 +136,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-plugin.ps1" add <
 ## 设计要点
 
 - **撤销语义**:自动快照在变更**之后**生成,所以"恢复最新存档"是空操作;真实撤销 = 回退到与当前状态**内容不同**的最新快照;全部相同则明确提示"没有可撤销的变化"。
-- **撤销不会撤销掉自己**:恢复 `cordis.patch.yml` 后自动检查并重新写入 dsh-undo 挂载条。
+- **撤销不会撤销掉自己**:恢复 `cordis.patch.yml` 后自动检查并重新写入 dsh-undo-savepoint 挂载条。
 - **自动存档不误伤撤销**:watcher 记录恢复操作写入的内容哈希,恢复动作自己的文件变化不会被自动存档(否则会挡住 redo);真实变更照常存档。
 - **格式互通**:Node 插件与 PowerShell 工具共用快照仓库与 manifest 格式;Windows PowerShell 5.1 与 PowerShell 7 均兼容。
 

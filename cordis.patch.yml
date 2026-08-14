@@ -3,4 +3,4 @@
 # This declares the plugin's own loader entry, inserted into the profile tree.
 - insert:
     - id: dsh-undo
-      name: 'dsh-undo'
+      name: 'dsh-undo-savepoint'

@@ -1,4 +1,4 @@
-# dsh-undo — Undo/rollback system for DSH
+# dsh-undo-savepoint — Undo/rollback system for DSH
 
 [![awesome · DSH plugin](https://awesome-dsh-plugin.com/badge.svg)](https://awesome-dsh-plugin.com)
 
@@ -49,23 +49,23 @@ Prerequisites: DSH (`@deepseek-ai/dsh`) and Node.js (≥20).
 **Option A (recommended, ecosystem standard)** — this plugin declares a `dsh.bundle` manifest, so install it with the official plugin command:
 
 ```bat
-dsh plugin --profile web add github:lire1131/dsh-undo-plugin#master
+dsh plugin --profile web add github:lire1131/dsh-undo-savepoint-plugin#master
 ```
 
 Restart DSH after installing. Snapshot directories and options are configurable in Settings.
 
 **Option B (local source / pre-release)** — clone and mount manually:
 
-1. **Clone the repository** into a local plugins directory (an ASCII path is safer), e.g. `D:\dsh\plugins\dsh-undo`:
+1. **Clone the repository** into a local plugins directory (an ASCII path is safer), e.g. `D:\dsh\plugins\dsh-undo-savepoint`:
 
 ```bat
-git clone https://github.com/lire1131/dsh-undo-plugin.git D:\dsh\plugins\dsh-undo
+git clone https://github.com/lire1131/dsh-undo-savepoint-plugin.git D:\dsh\plugins\dsh-undo-savepoint
 ```
 
-2. **Create a junction** so DSH's module resolver can find the local package by name `dsh-undo` (used by both the host plugin and the WebUI client plugin):
+2. **Create a junction** so DSH's module resolver can find the local package by name `dsh-undo-savepoint` (used by both the host plugin and the WebUI client plugin):
 
 ```bat
-mklink /J "<your-dsh-install>\node_modules\dsh-undo" "D:\dsh\plugins\dsh-undo"
+mklink /J "<your-dsh-install>\node_modules\dsh-undo-savepoint" "D:\dsh\plugins\dsh-undo-savepoint"
 ```
 
 > DSH resolves package names by walking up from its own `node_modules`. The default location is `C:\Users\<username>\node_modules` when npm installed into the user directory; if you run DSH from an npx cache, junction into that cache's `node_modules` instead. Check the path in DSH's startup error output or run `npm root -g`.
@@ -74,8 +74,8 @@ mklink /J "<your-dsh-install>\node_modules\dsh-undo" "D:\dsh\plugins\dsh-undo"
 
 ```yaml
 - insert:
-    - id: dsh-undo
-      name: dsh-undo
+    - id: dsh-undo-savepoint
+      name: dsh-undo-savepoint
 ```
 
 4. **Activate**: saving hot-reloads the host part; refresh the page to see the header buttons and settings rows; restart DSH for full steady state (legacy flat snapshots migrate automatically).
@@ -99,17 +99,17 @@ mklink /J "<your-dsh-install>\node_modules\dsh-undo" "D:\dsh\plugins\dsh-undo"
 From the repository directory:
 
 ```powershell
-# GUI window (recommended): double-click tools\dsh-undo-gui.bat, or:
-powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-undo-gui.ps1"
+# GUI window (recommended): double-click tools\dsh-undo-savepoint-gui.bat, or:
+powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-undo-savepoint-gui.ps1"
 
 # CLI
-powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-undo.ps1" list
-powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-undo.ps1" snapshot -Label "reason"
-powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-undo.ps1" undo
-powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-undo.ps1" redo
-powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-undo.ps1" restore -Id <id> -Force
-powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-undo.ps1" remove -Id <id>
-powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-undo.ps1" prune -KeepAuto 20
+powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-undo-savepoint.ps1" list
+powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-undo-savepoint.ps1" snapshot -Label "reason"
+powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-undo-savepoint.ps1" undo
+powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-undo-savepoint.ps1" redo
+powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-undo-savepoint.ps1" restore -Id <id> -Force
+powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-undo-savepoint.ps1" remove -Id <id>
+powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-undo-savepoint.ps1" prune -KeepAuto 20
 
 # Safe plugin install (auto snapshots before/after; auto-rollback on failure)
 powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-plugin.ps1" add <package>
