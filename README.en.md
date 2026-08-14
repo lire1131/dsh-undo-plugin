@@ -46,7 +46,7 @@ Prerequisites: DSH (`@deepseek-ai/dsh`) and Node.js (≥20).
 1. **Clone the repository** into a local plugins directory (an ASCII path is safer), e.g. `D:\dsh\plugins\dsh-undo`:
 
 ```bat
-git clone https://github.com/lire1131/dsh-undo.git D:\dsh\plugins\dsh-undo
+git clone https://github.com/lire1131/dsh-undo-plugin.git D:\dsh\plugins\dsh-undo
 ```
 
 2. **Create a junction** so DSH's module resolver can find the local package by name `dsh-undo` (used by both the host plugin and the WebUI client plugin):
