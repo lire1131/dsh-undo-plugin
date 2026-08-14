@@ -111,7 +111,7 @@ function Update-List {
         $item.Tag = $s.id
         $list.Items.Add($item) | Out-Null
     }
-    Set-Status "共 @($snaps.Count) 个快照(最新在上)。双击某行 = 回退到该版本。"
+    Set-Status "共 $($snaps.Count) 个快照(最新在上)。双击某行 = 回退到该版本。"
 }
 
 function Save-Snapshot {
