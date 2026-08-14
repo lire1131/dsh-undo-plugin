@@ -1,9 +1,20 @@
 ﻿# dsh-undo-gui.ps1 - DSH 撤销管理器(独立程序窗口,不依赖 DSH 运行)
 # 双击 dsh-undo-gui.bat 或桌面「DSH 撤销管理器」快捷方式打开。
 # 功能:查看/维护快照、手动保存、撤销、恢复、回退到指定版本、删除。
+# 说明:本脚本自行隐藏控制台窗口,因此启动参数不需要 -WindowStyle Hidden
+#      (该参数组合易被安全软件误报为木马行为)。
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 . (Join-Path $PSScriptRoot 'dsh-undo-lib.ps1')
+
+# Hide the console window right after startup (safe no-op when none exists).
+try {
+    Add-Type -Namespace UndoWin -Name Native -MemberDefinition @'
+[DllImport("user32.dll")] public static extern bool ShowWindow(System.IntPtr h, int c);
+[DllImport("kernel32.dll")] public static extern System.IntPtr GetConsoleWindow();
+'@
+    $null = [UndoWin.Native]::ShowWindow([UndoWin.Native]::GetConsoleWindow(), 0)
+} catch { /* ignore: console hiding is cosmetic */ }
 
 [System.Windows.Forms.Application]::EnableVisualStyles()
 
