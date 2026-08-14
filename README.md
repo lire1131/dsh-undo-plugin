@@ -1,43 +1,61 @@
 # dsh-undo — DSH 撤销/回退系统
 
-为 DeepSeek Harness (DSH) 打造的撤销/回退系统:**装插件、换皮肤、改设置,自动保存即存档;手动保存随时存档;一键撤销/恢复/回退到任意版本**,DSH 启动不了时还有局外工具(GUI 窗口 + 命令行)兜底。
+为 [DeepSeek Harness (DSH)](https://github.com/deepseek-ai/deepseek-harness) 打造的撤销/回退系统:**装插件、换皮肤、改设置,自动保存即存档;手动保存随时存档;一键撤销/恢复/回退到任意版本**,DSH 启动不了时还有局外工具(GUI 窗口 + 命令行)兜底。
+
+## 预览
+
+| 会话头部按钮(撤销/恢复/快照) | 快照管理面板 |
+|---|---|
+| ![1](docs/1.png) | ![2](docs/2.png) |
+
+| 局外程序窗口(DSH 撤销管理器) | 设置中的快捷键与快照参数 |
+|---|---|
+| ![3](docs/3.png) | ![4](docs/4.png) |
 
 ## 功能一览
 
 | 入口 | 能力 |
 |---|---|
 | **WebUI 头部按钮** | 「撤销」(红)「恢复」(绿)「快照」三个按钮,所有会话可见 |
-| **快照管理面板** | 「快照」按钮打开:可视化列表(时间/类型/原因/文件数/所在库)、**回退到任意快照版本**、**删除快照**、手动保存、刷新 |
+| **快照管理面板** | 可视化列表(时间/类型/原因/文件数/所在库)、**回退到任意快照版本**、**删除快照**、手动保存、刷新 |
 | **键盘快捷键** | 默认 **Ctrl+Alt+Z**(撤销)/ **Ctrl+Alt+Y**(恢复),设置 → 通用 可自定义 |
 | **双模式保存** | **手动保存**(主动存档,永不被自动清理)+ **自动保存**(配置变化 1.5 秒防抖自动存档,保留最近 20 份);**两种模式存储位置不同** |
 | **可配置参数** | 设置 → 通用 →「快照设置」:自动保存开关、防抖毫秒、自动档保留数量、手动快照目录、自动快照目录,保存即生效 |
-| **对话指令** | 说"撤销上一步 / 回退 / 恢复 / 保存快照 / 查看快照",AI 自动调用工具完成 |
-| **撤销/重做栈** | 连续多步撤销;撤销后可重做;有新变更则阻止重做;每次撤销前先存"后悔档" |
-| **局外工具** | `dsh-undo.ps1`(CLI:snapshot/undo/redo/restore/remove/list/diff/prune/status)+ **`dsh-undo-gui.ps1` 程序窗口**(桌面「DSH 撤销管理器」快捷方式)+ `dsh-plugin.ps1`(安全装插件) |
+| **对话指令** | 对 AI 说"撤销上一步 / 回退 / 恢复 / 保存快照 / 查看快照",自动调用工具完成 |
+| **撤销/重做栈** | 连续多步撤销;撤销后可重做;有新变更则阻止重做;每次撤销前先把当前状态存为"后悔档" |
+| **局外工具** | CLI(`snapshot/undo/redo/restore/remove/list/diff/prune/status`)+ **程序窗口**(桌面快捷方式)+ 安全装插件包装器 |
 
-## 存储位置(手动/自动分开)
+## 快照内容与存储
 
-| 库 | 默认路径 | 内容 |
+快照对象是 DSH 的 6 个配置文件:`cordis.patch.yml`、`package.json`、`cordis.yml`、`pnpm-workspace.yaml`(profile 下)+ `settings.yaml`、`.env`(~/.dsh 下)。
+
+| 库 | 默认路径(可在设置中修改) | 内容 |
 |---|---|---|
-| 手动库 | `D:\dsh\undo-snapshots\manual\` | 手动保存的快照(永不自动清理) |
-| 自动库 | `D:\dsh\undo-snapshots\auto\` | 自动快照、启动基线、撤销后悔档(自动档保留最近 20 份) |
-| 旧库(兼容) | `D:\dsh\undo-snapshots\` 根 | 旧版扁平布局,读取兼容,启动时自动迁移到新库 |
+| 手动库 | `<快照根>\manual\` | 手动保存的快照(永不自动清理) |
+| 自动库 | `<快照根>\auto\` | 自动快照、启动基线、撤销后悔档(自动档保留最近 20 份) |
+| 旧库(兼容) | `<快照根>\` 根 | 旧版扁平布局,读取兼容,启动时自动迁移到新库 |
 
-⚠️ 快照含 `.env` 等配置副本,可能含密钥——不要外传/推 GitHub(已加入 .gitignore 之外,注意整个目录别打包分享)。
+> ⚠️ 快照含 `.env` 等配置副本,可能含密钥——不要外传。
 
-## 快照内容(6 个配置文件)
+## 安装
 
-`cordis.patch.yml`、`package.json`、`cordis.yml`、`pnpm-workspace.yaml`(profile 下)+ `settings.yaml`、`.env`(~/.dsh 下)。
+前置:已安装 DSH(`@deepseek-ai/dsh`)与 Node.js(≥20)。
 
-## 安装 / 挂载
-
-1. 建立 junction(让 DSH 模块解析器找到本地包):
+1. **把仓库放到本地插件目录**(无中文路径更稳妥),例如 `D:\dsh\plugins\dsh-undo`:
 
 ```bat
-mklink /J "C:\Users\yzf\node_modules\dsh-undo" "D:\dsh\插件\dsh-undo"
+git clone https://github.com/lire1131/dsh-undo.git D:\dsh\plugins\dsh-undo
 ```
 
-2. 在 `C:\Users\yzf\.dsh\profiles\web\cordis.patch.yml` 追加:
+2. **建立 junction**,让 DSH 的模块解析器通过包名 `dsh-undo` 找到本地源码(host 插件与 WebUI client 插件都靠它):
+
+```bat
+mklink /J "<你的DSH安装>\node_modules\dsh-undo" "D:\dsh\plugins\dsh-undo"
+```
+
+> 说明:DSH 从它自己的 `node_modules` 向上解析包名。默认安装位置是 `C:\Users\<用户名>\node_modules`(npm 安装在用户目录时);若用 npx 缓存运行,则对 npx 缓存目录下的 `node_modules` 建 junction。执行 `npm root -g` / 检查 DSH 启动报错路径即可确认。
+
+3. **挂载到 profile 补丁层**:编辑 `<DSH_HOME>\profiles\web\cordis.patch.yml`,追加:
 
 ```yaml
 - insert:
@@ -45,38 +63,42 @@ mklink /J "C:\Users\yzf\node_modules\dsh-undo" "D:\dsh\插件\dsh-undo"
       name: dsh-undo
 ```
 
-3. 保存即热加载(host);刷新页面出现按钮;重启后一切进入稳态。
+4. **生效**:保存即热加载(host 部分);刷新页面出现头部按钮与设置项;重启 DSH 后一切进入稳态(旧版扁平快照会自动迁移)。
+
+> 依赖说明:host 插件通过 `createRequire('<DSH安装根>/package.json')` 加载 `@deepseek-ai/dsh-tools`。若 DSH 安装在其他位置,设置环境变量 `DSH_ROOT=<DSH安装根>` 即可,无需额外安装依赖。
 
 ## 使用
 
-- **撤销**:头部「撤销」按钮 / `Ctrl+Alt+Z` / 对话说"撤销上一步"。
+- **撤销**:头部「撤销」按钮 / `Ctrl+Alt+Z` / 对 AI 说"撤销上一步"。
 - **恢复**:「恢复」按钮 / `Ctrl+Alt+Y`(仅当撤销后没有新操作)。
-- **手动保存**:面板里「手动保存」/ 对话说"保存快照" / CLI `snapshot`。
-- **回退到指定版本**:面板里点快照行「回退到此版本」;或对话"回退到 <id>";或 CLI `restore -Id <id>`。
+- **手动保存**:面板里「手动保存」/ 对 AI 说"保存快照" / CLI `snapshot`。
+- **回退到指定版本**:面板里点快照行「回退到此版本」;或对 AI 说"回退到 <id>";或 CLI `restore -Id <id>`。
 - **删除快照**:面板里点「删除」;或 CLI `remove -Id <id>`。
 - **自定义快捷键**:设置 → 通用 → 撤销/恢复快捷键(点击输入框后按组合键,Backspace 清除)。
-- **保存参数**:设置 → 通用 → 快照设置(自动保存开关、防抖、保留数、两个目录)。
+- **保存参数**:设置 → 通用 → 快照设置(自动保存开关、防抖、保留数、两个目录,目录旁 📁 按钮可打开系统目录选择器)。
 
 ### 局外工具(DSH 挂了也能用)
 
+进入仓库目录后:
+
 ```powershell
-# 程序窗口(推荐):双击桌面「DSH 撤销管理器」,或:
-powershell -NoProfile -ExecutionPolicy Bypass -File "D:\dsh\插件\dsh-undo\tools\dsh-undo-gui.ps1"
+# 程序窗口(推荐):双击 tools\dsh-undo-gui.bat,或:
+powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-undo-gui.ps1"
 
 # 命令行
-powershell -NoProfile -ExecutionPolicy Bypass -File "D:\dsh\插件\dsh-undo\tools\dsh-undo.ps1" list
-powershell -NoProfile -ExecutionPolicy Bypass -File "D:\dsh\插件\dsh-undo\tools\dsh-undo.ps1" snapshot -Label "原因"
-powershell -NoProfile -ExecutionPolicy Bypass -File "D:\dsh\插件\dsh-undo\tools\dsh-undo.ps1" undo
-powershell -NoProfile -ExecutionPolicy Bypass -File "D:\dsh\插件\dsh-undo\tools\dsh-undo.ps1" redo
-powershell -NoProfile -ExecutionPolicy Bypass -File "D:\dsh\插件\dsh-undo\tools\dsh-undo.ps1" restore -Id <id> -Force
-powershell -NoProfile -ExecutionPolicy Bypass -File "D:\dsh\插件\dsh-undo\tools\dsh-undo.ps1" remove -Id <id>
-powershell -NoProfile -ExecutionPolicy Bypass -File "D:\dsh\插件\dsh-undo\tools\dsh-undo.ps1" prune -KeepAuto 20
+powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-undo.ps1" list
+powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-undo.ps1" snapshot -Label "原因"
+powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-undo.ps1" undo
+powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-undo.ps1" redo
+powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-undo.ps1" restore -Id <id> -Force
+powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-undo.ps1" remove -Id <id>
+powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-undo.ps1" prune -KeepAuto 20
 
 # 安全装插件(自动前后存档,失败自动回退)
-powershell -NoProfile -ExecutionPolicy Bypass -File "D:\dsh\插件\dsh-undo\tools\dsh-plugin.ps1" add <包名>
+powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-plugin.ps1" add <包名>
 ```
 
-常见事故场景:**启动报 `duplicate loader entry id` 之类错误** → 打开「DSH 撤销管理器」选中出问题前的快照 → 回退 → 重启 DSH。不用重装、不丢会话。
+常见事故场景:**DSH 启动报 `duplicate loader entry id` 之类错误** → 打开「DSH 撤销管理器」选中出问题前的快照 → 回退 → 重启 DSH。不用重装、不丢会话。
 
 ## REST API(WebUI 的后端)
 
@@ -90,26 +112,21 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "D:\dsh\插件\dsh-undo\tool
 | `POST /api/undo/restore` | body `{id}` 回退到指定版本 |
 | `POST /api/undo/remove` | body `{id}` 删除快照 |
 | `POST /api/undo/snapshot` | body `{reason}` 手动保存 |
+| `POST /api/undo/pick-dir` | 弹出系统目录选择器,返回选中路径 |
 
 ## 设计要点
 
 - **撤销语义**:自动快照在变更**之后**生成,所以"恢复最新存档"是空操作;真实撤销 = 回退到与当前状态**内容不同**的最新快照;全部相同则明确提示"没有可撤销的变化"。
 - **撤销不会撤销掉自己**:恢复 `cordis.patch.yml` 后自动检查并重新写入 dsh-undo 挂载条。
 - **自动存档不误伤撤销**:watcher 记录恢复操作写入的内容哈希,恢复动作自己的文件变化不会被自动存档(否则会挡住 redo);真实变更照常存档。
-- **格式互通**:Node 插件与 PS 工具共用快照仓库与 manifest 格式;PS 5.1 与 PowerShell 7 均兼容(ps1 无中文、GUI 带 BOM)。
+- **格式互通**:Node 插件与 PowerShell 工具共用快照仓库与 manifest 格式;Windows PowerShell 5.1 与 PowerShell 7 均兼容。
 
 ## 开发
 
-- 依赖解析:host 插件通过 `createRequire('C:/Users/yzf/package.json')` 加载 `@deepseek-ai/dsh-tools`(环境变量 `DSH_ROOT` 可覆盖)。
-- 测试(不需要 DSH 运行):
+- 依赖解析:host 插件通过 `createRequire(<DSH安装根>/package.json)` 加载 `@deepseek-ai/dsh-tools`(环境变量 `DSH_ROOT` 可覆盖),无需在仓库内安装依赖。
+- 测试(不需要 DSH 运行,在仓库目录执行):
 
 ```bat
-node D:\dsh\插件\dsh-undo\tools\smoke-test.mjs     :: 29 项逻辑测试
-node D:\dsh\插件\dsh-undo\tools\e2e-watch.mjs      :: 6 项真实时序回归(自动存档/撤销/重做)
+node tools\smoke-test.mjs     :: 29 项逻辑测试(快照/撤销/重做/存储分流/无变化提示)
+node tools\e2e-watch.mjs      :: 6 项真实时序回归(自动存档/撤销不误伤/重做)
 ```
-
-## 投 GitHub
-
-1. 本机 Git 已装(2.55);仓库已 `git init` + 初始提交。
-2. 发布前把 `git config user.name/email` 改成自己的。
-3. 仓库加 `#dsh-plugin`、`#dsh` GitHub topic。
