@@ -65,7 +65,7 @@ Restart DSH after installing. Snapshot directories and options are configurable 
 1. **Clone the repository** into a local plugins directory (an ASCII path is safer), e.g. `D:\dsh\plugins\dsh-undo-savepoint`:
 
 ```bat
-git clone https://github.com/lire1131/dsh-undo-savepoint-plugin.git D:\dsh\plugins\dsh-undo-savepoint
+git clone https://github.com/lire1131/dsh-undo-plugin.git D:\dsh\plugins\dsh-undo-savepoint
 ```
 
 2. **Create a junction** so DSH's module resolver can find the local package by name `dsh-undo-savepoint` (used by both the host plugin and the WebUI client plugin):

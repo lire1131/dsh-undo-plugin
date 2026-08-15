@@ -67,7 +67,7 @@ dsh plugin --profile web add github:lire1131/dsh-undo-plugin#master
 1. **把仓库放到本地插件目录**(无中文路径更稳妥),例如 `D:\dsh\plugins\dsh-undo-savepoint`:
 
 ```bat
-git clone https://github.com/lire1131/dsh-undo-savepoint-plugin.git D:\dsh\plugins\dsh-undo-savepoint
+git clone https://github.com/lire1131/dsh-undo-plugin.git D:\dsh\plugins\dsh-undo-savepoint
 ```
 
 2. **建立 junction**,让 DSH 的模块解析器通过包名 `dsh-undo-savepoint` 找到本地源码(host 插件与 WebUI client 插件都靠它):
