@@ -4,6 +4,8 @@
 
 > English | [中文](README.md) | [Changelog](CHANGELOG.en.md)
 
+**DSH crash-rescue plugin: undo config & plugin-code changes, secret-safe snapshots, one-click SAFE MODE, plus offline CLI/GUI that work even when DSH won't boot.**
+
 An undo/rollback system for [DeepSeek Harness (DSH)](https://github.com/deepseek-ai/deepseek-harness): **every plugin install, skin switch or settings change is auto-snapshotted; manual saves whenever you want; one-click undo / redo / restore to any version** — plus offline CLI & GUI tools that still work even when DSH fails to boot.
 
 ## Preview
@@ -22,27 +24,16 @@ An undo/rollback system for [DeepSeek Harness (DSH)](https://github.com/deepseek
 
 ## Features
 
-| Entry | Capability |
+| Capability | What it does |
 |---|---|
-| **WebUI header buttons** | Red **Undo**, green **Redo** and **Snapshots** buttons, visible in every session |
-| **Snapshot manager panel** | Visual list (time / type / reason / file count / store), **per-row diff preview** (added/removed lines), **restore to any snapshot version** (confirmation shows a change summary first), **delete snapshots**, manual save, clean-up, refresh |
-| **Keyboard shortcuts** | Default **Ctrl+Alt+Z** (undo) / **Ctrl+Alt+Y** (redo), customizable in Settings → General |
-| **Dual save modes** | **Manual saves** (never auto-pruned) + **auto saves** (debounced 1.5 s snapshot on config change, keeps latest 20); **the two modes have separate storage locations** |
-| **Configurable options** | Settings → General → Snapshot Settings: auto-save toggle, debounce ms, auto snapshots kept, **pre-restore snapshots kept, auto-cleanup toggle**, manual/auto snapshot directories, applied immediately |
-| **Auto-cleanup** | Excess snapshots are deleted automatically: auto keeps N, pre-restore keeps M (consumed first); manual snapshots are never deleted; disable it in settings to keep everything; "Clean up" in the panel prunes manually |
-| **Chat commands** | Just tell the AI "undo the last step / roll back / redo / save a snapshot / list snapshots" — tools are called automatically; after a config change the AI proactively mentions "auto-saved, you can undo anytime" |
-| **Undo/redo stack** | Multiple consecutive undos; redo re-applies the pre-undo state (blocked when newer changes exist); every restore first preserves the current state as a "pre-restore" snapshot |
-| **Plugin-code rollback** (v0.2) | Snapshots include user-plugin code trees (`D:\dsh\plugins\*` and profile-local code files) — a broken plugin edit is undoable even when no config file changed; content-addressed blob dedup with 4 size safeguards (whitelist / dedup / caps / restore-by-reference) |
-| **Cross-machine preflight** (v0.3.1) | Restore scans the snapshot's plugin references and clearly lists any that this machine cannot resolve (multi-anchor probing avoids false positives); see [docs/migration.en.md](docs/migration.en.md) for the migration guide |
-| **Sensitive-info redaction** (v0.3.2) | `.env` / `.credentials.yaml` enter snapshots with values replaced by `***REDACTED***` (structure preserved) — snapshots and exported ZIPs are safe to share; real values live in a local vault, **local rollbacks restore them fully**, cross-machine rollbacks yield placeholders + notes; `sensitiveMode` can switch to `keep` (plaintext) |
-| **Complete offline emergency kit** (v0.3.2) | GUI: crash banner (last-good one-click rollback) + **SAFE MODE button**; CLI: `recent` rollback log, `settings -Set` offline editing, restore output with needsRestart / preflight / redaction notes — everything needed when DSH is down |
-| **Crash attribution** (v0.3) | After an abnormal exit, names the concrete last-known-good snapshot with a one-click rollback button |
-| **One-click SAFE MODE** (v0.3) | Temporarily disables every user plugin except the undo system so DSH can always boot; entering auto-snapshots and backs up the config, exiting restores it; chat tool / WebUI button / offline CLI |
-| **Restart notice** (v0.3) | When a rollback touches plugin code or the mount config, clearly says "a DSH restart is required" |
-| **Crash self-check** | Detects when the previous DSH run crashed before finishing startup, warns in the snapshot list and panel, and suggests rolling back to the last good state |
-| **Export / import** | One-click ZIP export of all snapshots (backup / moving machines); import restores into the right store by kind and skips duplicates; panel buttons, chat tools and offline CLI all supported |
-| **Desktop shortcut** (v0.2.1) | Double-click `tools/make-desktop-shortcut.bat` to put a "DSH Undo Manager" shortcut on the desktop — never lose track of the external tools again |
-| **Offline tools** | CLI (`snapshot/undo/redo/restore/remove/list/diff/prune/export/import/status/safe-mode`) + **GUI window v2** (crash banner with one-click rollback, export/import, double-click diff preview, clean-up, settings panel, system tray) + safe plugin-install wrapper |
+| **Config + plugin-code rollback** | Snapshots cover config files AND user-plugin code trees — any broken edit is undoable (incl. pure code incidents like the whale-kit `yield*` crash); undo / redo / restore-to-any-version from WebUI, chat or offline CLI |
+| **Secret redaction + local vault** | `.env` / credentials enter snapshots auto-redacted (structure preserved) — exported ZIPs are safe to share; real values live in a local vault, **local rollbacks restore them fully** |
+| **One-click SAFE MODE** | When DSH cannot boot at all, temporarily disables every user plugin except the undo system so it always boots; auto-snapshots + config backup on entry, one-click exit |
+| **Crash attribution** | After an abnormal exit, names the concrete last-known-good snapshot with a one-click rollback button — no guessing |
+| **Safe cross-machine migration** | Restore preflights missing plugins and warns clearly; snapshots export/import as one-click ZIP (see [docs/migration.en.md](docs/migration.en.md)) |
+| **Offline emergency kit** | CLI + GUI window + one-click desktop shortcut: undo / restore / SAFE MODE / crash banner / rollback log — everything works when DSH is down |
+
+> Basic capabilities (keyboard shortcuts, chat commands, auto-cleanup, dual save modes, configurable options, …) are covered below and in the [Changelog](CHANGELOG.en.md).
 
 ## Crash rescue quick reference (pick by scenario)
 
