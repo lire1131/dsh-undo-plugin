@@ -10,17 +10,17 @@
 
 ## 预览
 
-| 会话头部按钮(撤销/恢复/快照) | 快照管理面板(差异/回退/删除/清理/导出/导入) |
+| WebUI 快照管理面板(差异/回退/删除/清理/导出/导入/安全模式) | WebUI 设置「快照」独立栏目(敏感模式/插件白名单/目录选择) |
 |---|---|
-| ![1](docs/1.png) | ![2](docs/2.png) |
+| ![panel](docs/webui-panel.png) | ![settings](docs/webui-settings-section.png) |
 
-| 设置:快捷键与快照参数 | 局外程序窗口 v2(保存/撤销/恢复/回退/删除/清理/导出/导入/设置) |
+| 局外程序窗口(两行工具栏 + 安全模式按钮,DSH 挂了也能用) | 局外设置对话框(敏感模式/浏览选目录) |
 |---|---|
-| ![3](docs/3.png) | ![4](docs/4.png) |
+| ![gui](docs/gui-main.png) | ![guisettings](docs/gui-settings.png) |
 
-| 一键导出全部快照(可备份/迁移) | 局外窗口:双击快照行查看差异 | 局外窗口:最小化到系统托盘 |
-|---|---|---|
-| ![5](docs/5.png) | ![6](docs/6.png) | ![7](docs/7.png) |
+| 安全模式确认(进入/退出) | 安全模式状态提示 |
+|---|---|
+| ![confirm](docs/safe-mode-confirm.png) | ![done](docs/safe-mode-done.png) |
 
 ## 功能一览
 

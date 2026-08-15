@@ -8,17 +8,17 @@ An undo/rollback system for [DeepSeek Harness (DSH)](https://github.com/deepseek
 
 ## Preview
 
-| Header buttons (Undo / Redo / Snapshots) | Snapshot manager panel (diff / restore / delete / clean-up / export / import) |
+| WebUI snapshot manager (diff / restore / delete / clean-up / export / import / SAFE MODE) | WebUI Settings — own "Snapshots" section (sensitive mode / plugin whitelist / dir pickers) |
 |---|---|
-| ![1](docs/1.png) | ![2](docs/2.png) |
+| ![panel](docs/webui-panel.png) | ![settings](docs/webui-settings-section.png) |
 
-| Settings: shortcuts & snapshot options | Offline GUI v2 (save / undo / redo / restore / delete / clean-up / export / import / settings) |
+| Offline GUI (two-row toolbar + SAFE MODE button; works when DSH is down) | Offline settings dialog (sensitive mode / Browse dirs) |
 |---|---|
-| ![3](docs/3.png) | ![4](docs/4.png) |
+| ![gui](docs/gui-main.png) | ![guisettings](docs/gui-settings.png) |
 
-| One-click export of all snapshots (backup / migration) | Offline window: double-click a row to view its diff | Offline window: minimize to system tray |
-|---|---|---|
-| ![5](docs/5.png) | ![6](docs/6.png) | ![7](docs/7.png) |
+| SAFE MODE confirmation (enter / exit) | SAFE MODE status notice |
+|---|---|
+| ![confirm](docs/safe-mode-confirm.png) | ![done](docs/safe-mode-done.png) |
 
 ## Features
 
