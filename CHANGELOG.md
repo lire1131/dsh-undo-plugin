@@ -7,20 +7,27 @@ dsh-undo-savepoint 的重要变更。日期为本地时间(UTC+8)。English vers
 ### 新增
 - **敏感信息脱敏 + 本机 vault**（默认开启）：`.env` 与 `.credentials.yaml` 进快照时值替换为 `***REDACTED***`（键名/export/引号/注释/结构全保留），快照与导出 ZIP 可自由外传零泄露；真实值存本机 vault（`<autoDir>/env-vault/`，内容寻址），**本机回滚完整还原含值**，换机回滚得到占位 + 提示填写
   - `sensitiveMode` 设置：`redact`（默认）/ `keep`（明文旧行为）；旧快照自动兼容
-  - 设置项与离线 CLI `settings` 同步支持
+  - **diff 两侧都脱敏**（快照侧与当前侧，含旧快照明文），界面永不出现真实值
+- **`.credentials.yaml` 纳入快照范围**（此前不在——DSH 真凭据文件损坏时局内外都救不了）
 - **局外急救补齐**（DSH 挂了也能救全）：
   - **GUI 崩溃横幅升级**：读 boot-state.json（旧逻辑查已废弃的 .booting，v0.3 后失效已修复），显示 last-good 快照 + 一键回退到该快照
-  - **GUI 一键安全模式按钮**：on/off/状态确认框（此前只有 CLI 有）
+  - **GUI 一键安全模式按钮**（on/off 确认框）；**GUI 标题栏显示当前敏感模式**
   - **CLI 新增 `recent` 命令**：查看回滚日志（WebUI 的 undo_recent 对等能力）
   - **CLI `settings -Label "key=value;..."`**：离线修改设置（此前只读）
   - **CLI undo/redo/restore 输出增强**：needsRestart / 跨机 preflight 警告 / 脱敏占位 Note 提示
-- `.credentials.yaml` 纳入快照范围（此前不在——DSH 真凭据文件损坏时局内外都救不了）
+- **WebUI 设置独立侧栏栏目**：「快照」栏目一页展示全部设置（不再挤在"通用"里），含敏感模式下拉、插件目录白名单、目录 📁 选择
+- **设置双端同步修复**：ps1 补读 keepPre/autoCleanup（此前 GUI 打开显示为空并覆盖 WebUI 值）；GUI 目录选择用「浏览」按钮
+- **孤儿 blob 清理**：`undo_prune` / 清理过期顺带删除"无任何快照引用"的插件代码 blob（跨机导入残留不再占空间）
+- **导出敏感警告**：keep 模式或旧快照含明文敏感文件时，导出（对话/WebUI/CLI）明确警告"包含真实密钥,请勿外传"
+- **`undo_list` 显示敏感模式**：附当前模式 + 最近快照脱敏文件数
 
 ### 修复
 - ps1 `Get-UndoBootAlert` 升级为读 boot-state.json（含 lastGoodAt），新增 `Get-UndoLastGoodId`
+- GUI 工具栏 11 按钮溢出被列表遮挡（两行排列 + 单实例 Mutex 防重复后台）
+- diff 泄露：当前文件侧明文直接显示（如 `DEEPSEEK_API_KEY: sk-...`）——两侧统一脱敏
 
 ### 测试
-- smoke 76 → 91（脱敏规则各形态 / vault 本机完整恢复 / 换机占位 / keep 明文 / 旧快照兼容）；e2e 10/10
+- smoke 76 → 98（脱敏规则各形态 / vault 本机完整恢复 / 换机占位 / diff 双侧零泄露 / keep 明文 / 孤儿 blob 清理 / 旧快照兼容）；e2e 10/10
 
 ## [0.3.1] - 2026-08-15
 

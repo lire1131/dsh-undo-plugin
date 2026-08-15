@@ -542,6 +542,41 @@ const m13 = JSON.parse(await readFile(join(snap13, 'manual', m13dir, 'manifest.j
 check(m13.sensitiveMode === 'keep' && !m13.redacted.length, 'keep mode manifest has no redaction markers');
 await rm(root13, { recursive: true, force: true });
 
+console.log('== 21. orphan blob cleanup on prune (v0.3.2) ==');
+const root14 = await mkdtemp(join(tmpdir(), 'dsh-undo-test14-'));
+const home14 = join(root14, 'home'), profile14 = join(root14, 'profile'), snap14 = join(root14, 'snaps');
+await mkdir(home14, { recursive: true }); await mkdir(profile14, { recursive: true });
+await writeFile(join(home14, 'settings.yaml'), 'model: x\n');
+await writeFile(join(profile14, 'cordis.patch.yml'), '# patch\n[]\n');
+const tools14 = new Map();
+const ctx14 = {
+  tools: { register: (t) => { tools14.set(t.name, t); return () => { }; } },
+  systemPrompt: { section: () => () => { } }, get: () => undefined,
+  effect: (fn) => { const d = fn(); return d ?? (() => { }); }, logger: { info: () => { }, warn: () => { } },
+};
+apply(ctx14, { manualDir: join(snap14, 'manual'), autoDir: join(snap14, 'auto'), homeDir: home14, profileDir: profile14, watch: false, pluginDirs: [], autoEnabled: false });
+await new Promise((r) => setTimeout(r, 300));
+const run14 = async (name, args) => (await tools14.get(name).execute(args, {}));
+const blobDir14 = join(snap14, 'blobs');
+// baseline 时 patch 无 ./ 引用 → 无 profile blob（目录不存在或为空都算通过）
+let preBlobEmpty = true;
+try { preBlobEmpty = (await readdir(blobDir14)).length === 0; } catch { preBlobEmpty = true; }
+check(preBlobEmpty, 'no blobs before profile code exists');
+// 引入 profile 本地代码 → 快照产生 blob
+await writeFile(join(profile14, 'router-global.mjs'), 'export const a = 1;\n');
+await writeFile(join(profile14, 'cordis.patch.yml'), '# patch\n- insert:\n    - id: rg\n      name: \'./router-global.mjs\'\n');
+await run14('undo_snapshot', { reason: 's1' });
+const blobsAfter14 = await readdir(blobDir14);
+check(blobsAfter14.length === 1, 'profile code blob created');
+// 删除唯一引用它的快照 → prune 清孤儿（无 undo_remove 工具，直接删目录模拟）
+const s1Id14 = (await readdir(join(snap14, 'manual'))).find((d) => d !== '.booting');
+await rm(join(snap14, 'manual', s1Id14), { recursive: true, force: true });
+out = await run14('undo_prune', {});
+console.log('   ', out);
+check(out.includes('orphan blob'), 'prune reports orphan blob cleanup');
+check((await readdir(blobDir14)).length === 0, 'orphan blob removed');
+await rm(root14, { recursive: true, force: true });
+
 await rm(root, { recursive: true, force: true });
 console.log(`\n== RESULT: ${pass} passed, ${fail} failed ==`);
 process.exit(fail > 0 ? 1 : 0);

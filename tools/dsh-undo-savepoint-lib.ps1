@@ -305,6 +305,8 @@ function Get-UndoSettings {
         autoEnabled = $true
         watchDebounceMs = 1500
         keepAuto = 20
+        keepPre = 10
+        autoCleanup = $true
         manualDir = $script:UndoManualDir
         autoDir = $script:UndoAutoDir
         pluginDirs = @()
@@ -318,6 +320,10 @@ function Get-UndoSettings {
             if ($j.autoEnabled -is [bool]) { $defaults.autoEnabled = $j.autoEnabled }
             if ($j.watchDebounceMs) { $defaults.watchDebounceMs = [int]$j.watchDebounceMs }
             if ($j.keepAuto) { $defaults.keepAuto = [int]$j.keepAuto }
+            # v0.3.2: keepPre / autoCleanup MUST be read back too, otherwise the
+            # GUI opens them empty and overwrites WebUI-set values on save
+            if ($null -ne $j.keepPre) { $defaults.keepPre = [int]$j.keepPre }
+            if ($null -ne $j.autoCleanup) { $defaults.autoCleanup = [bool]$j.autoCleanup }
             if ($j.pluginDirs) { $defaults.pluginDirs = @($j.pluginDirs) }
             if ($j.sensitiveMode) { $defaults.sensitiveMode = $j.sensitiveMode }
         } catch { }
@@ -617,7 +623,25 @@ function Invoke-UndoPrune {
         Remove-Item -LiteralPath $s._Dir -Recurse -Force -ErrorAction SilentlyContinue
         $removedPre++
     }
-    return @{ removedAuto = $removedAuto; removedPre = $removedPre }
+    # orphan blobs (v0.3.2): no remaining snapshot references them
+    $removedBlobs = 0
+    $blobDir = Get-UndoBlobDir
+    if (Test-Path -LiteralPath $blobDir) {
+        $refs = @{}
+        foreach ($s in $list) {
+            foreach ($p in @($s.plugins | Where-Object { $_ })) {
+                foreach ($f in @($p.files | Where-Object { $_ })) { if ($f.hash) { $refs[$f.hash] = $true } }
+            }
+            foreach ($f in @($s.profileFiles | Where-Object { $_ -and $_.hash })) { $refs[$f.hash] = $true }
+        }
+        foreach ($bf in Get-ChildItem -LiteralPath $blobDir -File -Force -ErrorAction SilentlyContinue) {
+            if (-not $refs.ContainsKey($bf.Name)) {
+                Remove-Item -LiteralPath $bf.FullName -Force -ErrorAction SilentlyContinue
+                $removedBlobs++
+            }
+        }
+    }
+    return @{ removedAuto = $removedAuto; removedPre = $removedPre; removedBlobs = $removedBlobs }
 }
 
 # ── cross-machine preflight (v0.3.1/0.3.2): which referenced plugins resolve ─
@@ -737,12 +761,22 @@ function Export-UndoSnapshots {
     $zip = Join-Path $exportRoot "dsh-undo-export-$ts.zip"
     $count = 0
     try {
+        $sensitiveWarning = $false
         foreach ($pair in @(@('manual', $settings.manualDir), @('auto', $settings.autoDir))) {
             $label = $pair[0]
             $base = $pair[1]
             if (-not (Test-Path -LiteralPath $base)) { continue }
             foreach ($d in Get-ChildItem -LiteralPath $base -Directory -Force -ErrorAction SilentlyContinue) {
                 if (-not (Test-Path -LiteralPath (Join-Path $d.FullName 'manifest.json'))) { continue }
+                # v0.3.2: flag archives that hold real secrets (keep mode / legacy plaintext)
+                try {
+                    $m = Get-Content -LiteralPath (Join-Path $d.FullName 'manifest.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+                    if ($m.sensitiveMode -ne 'redact') {
+                        foreach ($fl in @($m.files)) {
+                            if (Test-UndoSensitiveName $fl.name) { $sensitiveWarning = $true; break }
+                        }
+                    }
+                } catch { }
                 $dest = Join-Path $tmp $label
                 New-Item -ItemType Directory -Force -Path $dest | Out-Null
                 Copy-Item -LiteralPath $d.FullName -Destination $dest -Recurse -Force
@@ -758,7 +792,7 @@ function Export-UndoSnapshots {
             }
         }
         Compress-Archive -Path (Join-Path $tmp '*') -DestinationPath $zip -Force
-        return @{ ok = $true; path = $zip; count = $count }
+        return @{ ok = $true; path = $zip; count = $count; sensitiveWarning = $sensitiveWarning }
     } catch {
         return @{ ok = $false; error = $_.Exception.Message }
     } finally {

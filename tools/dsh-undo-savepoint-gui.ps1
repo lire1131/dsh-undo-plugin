@@ -102,6 +102,7 @@ if ($script:IsZh) {
         settingsSensitive = '敏感模式(redact=脱敏默认/keep=明文)'
         settingsPluginDirs = '插件目录白名单(逗号分隔,留空=自动发现 junction)'
         settingsBrowse = '选择文件夹'
+        browseBtn = '浏览'
         settingsSave = '保存设置'
         settingsCancel = '取消'
         settingsSaved = '设置已保存'
@@ -174,6 +175,7 @@ if ($script:IsZh) {
         settingsSensitive = 'Sensitive mode (redact=default/keep=plaintext)'
         settingsPluginDirs = 'Plugin dirs whitelist (comma-separated, empty=auto-detect junctions)'
         settingsBrowse = 'Select folder'
+        browseBtn = 'Browse'
         settingsSave = 'Save settings'
         settingsCancel = 'Cancel'
         settingsSaved = 'Settings saved'
@@ -207,7 +209,8 @@ function Get-StoreLabel([string]$Store) {
 }
 
 $form = New-Object System.Windows.Forms.Form
-$form.Text = $script:UI.title
+# v0.3.2: title shows the current sensitive mode (redact / keep) at a glance
+$form.Text = "$($script:UI.title) · $((Get-UndoSettings).sensitiveMode)"
 $form.Size = New-Object System.Drawing.Size(1080, 640)
 $form.MinimumSize = New-Object System.Drawing.Size(820, 440)
 $form.StartPosition = 'CenterScreen'
@@ -494,13 +497,13 @@ function Show-Settings {
     $y += 34
     $lblMDir = New-Object System.Windows.Forms.Label; $lblMDir.Text = $script:UI.settingsManualDir; $lblMDir.SetBounds(16, $y + 4, 150, 20); $dlg.Controls.Add($lblMDir)
     $txtMDir = New-Object System.Windows.Forms.TextBox; $txtMDir.Text = [string]$s.manualDir; $txtMDir.SetBounds(170, $y, 300, 24); $dlg.Controls.Add($txtMDir)
-    $btnMDir = New-Object System.Windows.Forms.Button; $btnMDir.Text = '📁'; $btnMDir.SetBounds(478, $y, 30, 24)
+    $btnMDir = New-Object System.Windows.Forms.Button; $btnMDir.Text = $script:UI.browseBtn; $btnMDir.SetBounds(478, $y, 56, 24)
     $btnMDir.Add_Click({ $fbd = New-Object System.Windows.Forms.FolderBrowserDialog; $fbd.Description = $script:UI.settingsBrowse; if ($fbd.ShowDialog() -eq 'OK') { $txtMDir.Text = $fbd.SelectedPath } })
     $dlg.Controls.Add($btnMDir)
     $y += 34
     $lblADir = New-Object System.Windows.Forms.Label; $lblADir.Text = $script:UI.settingsAutoDir; $lblADir.SetBounds(16, $y + 4, 150, 20); $dlg.Controls.Add($lblADir)
     $txtADir = New-Object System.Windows.Forms.TextBox; $txtADir.Text = [string]$s.autoDir; $txtADir.SetBounds(170, $y, 300, 24); $dlg.Controls.Add($txtADir)
-    $btnADir = New-Object System.Windows.Forms.Button; $btnADir.Text = '📁'; $btnADir.SetBounds(478, $y, 30, 24)
+    $btnADir = New-Object System.Windows.Forms.Button; $btnADir.Text = $script:UI.browseBtn; $btnADir.SetBounds(478, $y, 56, 24)
     $btnADir.Add_Click({ $fbd = New-Object System.Windows.Forms.FolderBrowserDialog; $fbd.Description = $script:UI.settingsBrowse; if ($fbd.ShowDialog() -eq 'OK') { $txtADir.Text = $fbd.SelectedPath } })
     $dlg.Controls.Add($btnADir)
     $y += 34

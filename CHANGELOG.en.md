@@ -7,20 +7,27 @@ Notable changes to dsh-undo-savepoint. Dates are in local time (UTC+8). 中文�
 ### Added
 - **Sensitive-info redaction + local vault** (on by default): `.env` and `.credentials.yaml` enter snapshots with values replaced by `***REDACTED***` (keys / `export` / quotes / comments / structure fully preserved) — snapshots and exported ZIPs are safe to share; the real values live in a local vault (`<autoDir>/env-vault/`, content-addressed), so **local rollbacks restore values completely**, while cross-machine rollbacks yield placeholders with a clear note
   - `sensitiveMode` setting: `redact` (default) / `keep` (plaintext legacy); old snapshots stay compatible
-  - exposed via settings and the offline CLI `settings` command
+  - **diff redacts BOTH sides** (snapshot and current, incl. old plaintext snapshots) — real values never appear in the UI
+- **`.credentials.yaml` added to the snapshot scope** (it was missing before — a broken credentials file was unrecoverable both in-UI and offline)
 - **Offline emergency tooling completed** (everything needed when DSH is down):
   - **GUI crash banner fixed & upgraded**: reads `boot-state.json` (the old `.booting` check silently broke after v0.3), shows the last-known-good snapshot with one-click rollback to that exact snapshot
-  - **GUI one-click SAFE MODE button** (on/off with confirmation; previously CLI-only)
+  - **GUI one-click SAFE MODE button** (on/off with confirmation); **GUI title bar shows the current sensitive mode**
   - **CLI `recent` command**: rollback log viewer (WebUI `undo_recent` counterpart)
   - **CLI `settings -Label "key=value;..."`**: edit settings offline (previously read-only)
   - **CLI undo/redo/restore output enriched**: needsRestart / cross-machine preflight warning / redacted-placeholder notes
-- `.credentials.yaml` added to the snapshot scope (it was missing before — a broken credentials file was unrecoverable both in-UI and offline)
+- **WebUI settings moved to their own sidebar section** ("Snapshots"): one full page with sensitive-mode dropdown, plugin-dirs whitelist and 📁 dir pickers — no longer squeezed into General
+- **Settings parity fixed**: ps1 now reads back keepPre/autoCleanup (the GUI used to open them empty and overwrite WebUI-set values); GUI dir pickers use a "Browse" button
+- **Orphan blob cleanup**: `undo_prune` also deletes plugin-code blobs no snapshot references anymore (cross-machine import leftovers no longer waste space)
+- **Export sensitive warning**: when keep-mode or legacy snapshots hold plaintext secrets, export (chat / WebUI / CLI) warns "contains REAL secrets — do not share"
+- **`undo_list` shows the sensitive mode** plus how many files the latest snapshot redacted
 
 ### Fixed
 - ps1 `Get-UndoBootAlert` upgraded to read `boot-state.json` (incl. `lastGoodAt`); new `Get-UndoLastGoodId`
+- GUI toolbar overflow hid buttons behind the list (two-row layout + single-instance Mutex)
+- diff leaked real values from the current-file side (e.g. `DEEPSEEK_API_KEY: sk-...`) — both sides redacted now
 
 ### Tests
-- smoke 76 → 91 (redaction shapes / vault full local restore / cross-machine placeholder / keep plaintext / old-snapshot compat); e2e 10/10
+- smoke 76 → 98 (redaction shapes / vault full local restore / cross-machine placeholder / diff zero-leak both sides / keep plaintext / orphan blob cleanup / old-snapshot compat); e2e 10/10
 
 ## [0.3.1] - 2026-08-15
 

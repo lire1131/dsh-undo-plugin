@@ -106,12 +106,15 @@ switch ($Command) {
     'prune' {
         $r = Invoke-UndoPrune
         if ($r.disabled) { Write-Host 'Auto-cleanup is disabled in settings - nothing deleted.'; break }
-        Write-Host "Pruned $($r.removedAuto) auto/baseline and $($r.removedPre) pre-restore snapshot(s)."
+        Write-Host "Pruned $($r.removedAuto) auto/baseline and $($r.removedPre) pre-restore snapshot(s)$(if ($r.removedBlobs -gt 0) { ", $($r.removedBlobs) orphan blob(s)" } else { '' })."
     }
     'export' {
         $r = Export-UndoSnapshots
         if (-not $r.ok) { Write-Host "export failed: $($r.error)"; exit 1 }
         Write-Host "Exported $($r.count) snapshot(s) to $($r.path)"
+        if ($r.sensitiveWarning) {
+            Write-Host 'WARNING: this archive contains REAL secrets (.env / .credentials.yaml in keep mode or legacy snapshots) - do NOT share it.'
+        }
     }
     'import' {
         if ([string]::IsNullOrEmpty($Id)) { throw 'import requires -Id <zip-path>' }
