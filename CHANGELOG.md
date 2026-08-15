@@ -1,43 +1,40 @@
-# Changelog
+# 更新日志
 
-All notable changes to dsh-undo-savepoint. Dates are in local time (UTC+8).
+dsh-undo-savepoint 的重要变更。日期为本地时间(UTC+8)。English version: [CHANGELOG.en.md](CHANGELOG.en.md)
+
+## [0.1.1] - 2026-08-15
+
+### 新增
+- **回滚事件日志**:每次 undo / redo / restore 成功后追加一条 JSON 记录(时间、模式、目标快照、被回滚的文件),保留最近 100 条
+- **`undo_recent` 工具**:随时查看最近的回滚操作,排查"配置怎么突然变了"——回滚可能发生在其他会话或离线工具里
+- **提示词规则 7**:用户对配置状态困惑时,AI 先调 `undo_recent` 确认是否为回滚所致
 
 ## [0.1.0] - 2026-08-14
 
-### Added
-- Auto-snapshot on every config change (debounced 1.5 s), baseline on every boot
-- Manual snapshots (never auto-pruned) and auto snapshots (keep latest N, default 20) in **separate stores** (`manual` / `auto`)
-- Undo / redo stack with "pre-restore" redo points; redo blocked when real newer changes exist
-- Restore to any snapshot version (snapshot manager panel / chat tools / CLI / GUI)
-- Snapshot manager panel: per-row **diff preview** (added/removed lines), restore confirmation with change summary, delete, clean-up, refresh
-- WebUI header buttons (Undo / Redo / Snapshots) + global keyboard shortcuts (**Ctrl+Alt+Z** / **Ctrl+Alt+Y**, customizable in Settings)
-- Snapshot settings (Settings → General): auto-save toggle, debounce ms, keep counts, auto-cleanup toggle, manual/auto directories with native folder picker
-- Auto-cleanup: auto/baseline beyond keepAuto, pre-restore beyond keepPre (consumed first); manual snapshots never deleted
-- Crash self-check: detects a previous DSH run that crashed before finishing, warns in the snapshot list/panel and offers rollback
-- Proactive notice: after a config change the AI mentions "auto-saved, you can undo anytime"
-- **Rollback log** (`<settings dir>/rollback-log.jsonl`, last 100 entries) + `undo_recent` tool: lets any session/AI see which files were rolled back and when
-- Export / import: one-click ZIP export of all snapshots (backup / migration); import restores by kind and skips duplicates (panel buttons, chat tools `undo_export`/`undo_import`, offline CLI `export`/`import`)
-- Offline CLI (`dsh-undo-savepoint.ps1`): snapshot/list/diff/restore/undo/redo/remove/prune/export/import/status
-- Offline GUI v2 (desktop shortcut): crash banner with one-click rollback, export/import, double-click diff preview, clean-up, settings panel, system tray
-- GitHub Actions CI (Node 20/22), MIT license, bilingual README with 7 screenshots
+### 新增
+- **自动快照 + 手动快照分库存储**(`manual` / `auto`):配置每次变更自动存档(1.5 秒防抖),启动生成 baseline;手动快照永不自动清理
+- **undo / redo / 恢复到任意版本**:pre-restore 重做点机制,存在更新的真实变更时禁止 redo
+- **快照管理面板**:逐条 diff 预览、恢复前变更摘要确认、删除、清理、导出 / 导入(ZIP 备份迁移)
+- **WebUI 撤销/重做/快照按钮 + 全局快捷键**(Ctrl+Alt+Z / Ctrl+Alt+Y,可自定义)
+- **崩溃自检**:上次 DSH 未正常启动时提示,可一键回滚
+- **主动告知**:配置变更后 AI 提示"已自动保存,随时可撤销"
+- **离线 CLI + GUI v2**:DSH 启动不了也能用(快照/撤销/回退/diff/清理/导出导入/设置/托盘)
+- **双语 GUI**(系统语言自动检测,`DSH_UNDO_LANG` 可覆盖)
+- **dsh.bundle 生态安装**:`dsh plugin add github:lire1131/dsh-undo-plugin#master`
+- 设置项:自动保存开关、防抖、保留数量、自动清理、快照目录(原生文件夹选择器)
 
-### Changed
-- Plugin renamed from `dsh-undo` to **`dsh-undo-savepoint`** (repo stays `lire1131/dsh-undo-plugin`)
-- Dependency resolution no longer hardcodes author paths: resolves `@deepseek-ai/dsh-tools` from the plugin location, falls back to `$DSH_ROOT`, clear error otherwise
-- Default stores/settings based on the user home (`~/.dsh/undo-snapshots`, `~/.dsh/undo/settings.json`); existing `settings.json` values take precedence
-- Auto snapshot reasons are classified (`plugin-change` / `patch-change` / `settings-change` / `config-change`)
+### 变更
+- 插件由 `dsh-undo` 更名为 **`dsh-undo-savepoint`**
+- 依赖解析不再硬编码作者路径(基于插件位置解析,回退 `$DSH_ROOT`)
+- 默认存储/设置基于用户主目录;旧版平铺存储自动迁移到分库结构
 
-### Fixed
-- Hardcoded author paths broke startup on other machines (issue #1)
-- Undo/redo: the watcher auto-snapshot of a restore's own writes blocked redo (content-hash echo detection)
-- Undo with identical snapshots now says "nothing to undo" instead of pretending
-- Prune never ran (store-directory comparison bug) — auto snapshots piled up; now the retention limits actually apply
-- Double-load bug (community report): `ensureMount` no longer adds a manual patch mount for bundle-installed plugins, and removes leftover duplicates
-- Diff preview was covered by other layers — now a topmost floating overlay
-- Settings row showed `[object Object]` for the auto-save checkbox label; GUI status bar showed a literal `@(...)` count
-- Launcher bat: paren-in-if-block parse error caused instant window exit
-- Install command in READMEs pointed at a wrong repo name (regression from the rename sweep)
+### 修复
+- 硬编码作者路径导致其他机器启动失败(issue #1)
+- undo/redo 被监听器自身写入的自动快照误拦(内容哈希回显检测)
+- prune 从未真正执行,自动快照无限堆积;保留上限现在真正生效
+- 双加载 bug(社区反馈):bundle 安装不再追加手动挂载,并清理历史遗留
+- README 安装命令指向错误仓库名
 
 ## [0.0.1] - 2026-08-14
 
-Initial local prototype: snapshot on change + undo/redo, later folded into 0.1.0.
+本地原型:配置变更快照 + undo / redo,后并入 0.1.0。

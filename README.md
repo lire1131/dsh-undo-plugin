@@ -2,7 +2,7 @@
 
 [![awesome · DSH plugin](https://awesome-dsh-plugin.com/badge.svg)](https://awesome-dsh-plugin.com)
 
-> 中文 | [English](README.en.md)
+> 中文 | [English](README.en.md) | [更新日志](CHANGELOG.md)
 
 **还在为 DSH 崩溃而苦恼?还在担心小改动会带来大灾难?这款工具能帮到你!**
 
