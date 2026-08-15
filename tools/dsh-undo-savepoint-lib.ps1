@@ -192,6 +192,29 @@ function Ensure-UndoMount {
     $patch = Join-Path $script:UndoProfileRoot 'cordis.patch.yml'
     if (-not (Test-Path -LiteralPath $patch)) { return $false }
     $content = [System.IO.File]::ReadAllText($patch)
+
+    # BUNDLE mode (installed via `dsh plugin add`): never add a manual mount
+    # (double-load bug); remove any leftover manual mount block instead.
+    $pkgPath = Join-Path $script:UndoProfileRoot 'package.json'
+    $bundleMode = $false
+    if (Test-Path -LiteralPath $pkgPath) {
+        try {
+            $pkg = Get-Content -LiteralPath $pkgPath -Raw -Encoding UTF8 | ConvertFrom-Json
+            $bundles = $pkg.dsh.profile.bundles
+            $bundleMode = ($bundles -is [array] -and $bundles -contains 'dsh-undo-savepoint')
+        } catch { }
+    }
+    if ($bundleMode) {
+        $pattern = '(?m)^# dsh-undo-savepoint mount[^\r\n]*\r?\n- insert:\r?\n\s+- id: dsh-undo-savepoint\r?\n\s+- name: ''?dsh-undo-savepoint''?\r?\n?'
+        $cleaned = $content -replace $pattern, ''
+        if ($cleaned -ne $content) {
+            [System.IO.File]::WriteAllText($patch, $cleaned, (New-Object System.Text.UTF8Encoding($false)))
+            return $true
+        }
+        return $false
+    }
+
+    # PATCH mode (local junction mount): ensure the manual mount line exists.
     if ($content -match 'dsh-undo-savepoint') { return $false }
     $content = $content -replace '(?m)^\s*\[\]\s*$', ''
     $block = "`n# dsh-undo-savepoint mount (re-ensured by dsh-undo-savepoint)`n- insert:`n    - id: dsh-undo-savepoint`n      name: dsh-undo-savepoint`n"

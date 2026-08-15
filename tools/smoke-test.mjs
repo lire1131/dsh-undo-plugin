@@ -230,6 +230,34 @@ out = await run5('undo_list', {});
 check(out.includes('did not finish starting'), 'boot alert shown in undo_list after simulated crash');
 await rm(root5, { recursive: true, force: true });
 
+console.log('== 14. bundle-mode double-load fix: leftover manual mount is removed ==');
+const root6 = await mkdtemp(join(tmpdir(), 'dsh-undo-test6-'));
+const home6 = join(root6, 'home'), profile6 = join(root6, 'profile'), snap6 = join(root6, 'snaps');
+await mkdir(home6, { recursive: true }); await mkdir(profile6, { recursive: true });
+await writeFile(join(home6, 'settings.yaml'), 'model: x\n');
+// profile declares the plugin in bundles (simulating `dsh plugin add` install)
+await writeFile(join(profile6, 'package.json'), JSON.stringify({ name: 'dsh-profile-web', dsh: { profile: { bundles: ['dsh-undo-savepoint'] } } }));
+// patch contains a leftover manual mount block written by an older ensureMount
+await writeFile(join(profile6, 'cordis.patch.yml'), '# patch\n[]\n\n# dsh-undo-savepoint mount (re-ensured by dsh-undo-savepoint)\n- insert:\n    - id: dsh-undo-savepoint\n      name: dsh-undo-savepoint\n');
+const tools6 = new Map();
+const ctx6 = {
+  tools: { register: (t) => { tools6.set(t.name, t); return () => { }; } },
+  systemPrompt: { section: () => () => { } }, get: () => undefined,
+  effect: (fn) => { const d = fn(); return d ?? (() => { }); }, logger: { info: () => { }, warn: () => { } },
+};
+apply(ctx6, { manualDir: join(snap6, 'manual'), autoDir: join(snap6, 'auto'), homeDir: home6, profileDir: profile6, watch: false });
+await new Promise((r) => setTimeout(r, 300));
+const run6 = async (name, args) => (await tools6.get(name).execute(args, {}));
+const set6 = async (v) => writeFile(join(profile6, 'package.json'), JSON.stringify({ name: 'dsh-profile-web', dsh: { profile: { bundles: ['dsh-undo-savepoint'] } }, v }));
+await run6('undo_snapshot', { reason: 's1' });
+await set6(2);
+await run6('undo_snapshot', { reason: 's2' });
+await run6('undo_restore', { mode: 'undo' }); // triggers ensureMount
+const patch6 = await readFile(join(profile6, 'cordis.patch.yml'), 'utf8');
+check(!patch6.includes('re-ensured'), 'leftover manual mount block removed in bundle mode');
+check(!patch6.includes('- id: dsh-undo-savepoint'), 'no manual mount re-added in bundle mode');
+await rm(root6, { recursive: true, force: true });
+
 await rm(root, { recursive: true, force: true });
 console.log(`\n== RESULT: ${pass} passed, ${fail} failed ==`);
 process.exit(fail > 0 ? 1 : 0);
