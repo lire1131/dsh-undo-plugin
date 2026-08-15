@@ -32,9 +32,14 @@ An undo/rollback system for [DeepSeek Harness (DSH)](https://github.com/deepseek
 | **Auto-cleanup** | Excess snapshots are deleted automatically: auto keeps N, pre-restore keeps M (consumed first); manual snapshots are never deleted; disable it in settings to keep everything; "Clean up" in the panel prunes manually |
 | **Chat commands** | Just tell the AI "undo the last step / roll back / redo / save a snapshot / list snapshots" — tools are called automatically; after a config change the AI proactively mentions "auto-saved, you can undo anytime" |
 | **Undo/redo stack** | Multiple consecutive undos; redo re-applies the pre-undo state (blocked when newer changes exist); every restore first preserves the current state as a "pre-restore" snapshot |
+| **Plugin-code rollback** (v0.2) | Snapshots include user-plugin code trees (`D:\dsh\plugins\*` and profile-local code files) — a broken plugin edit is undoable even when no config file changed; content-addressed blob dedup with 4 size safeguards (whitelist / dedup / caps / restore-by-reference) |
+| **Crash attribution** (v0.3) | After an abnormal exit, names the concrete last-known-good snapshot with a one-click rollback button |
+| **One-click SAFE MODE** (v0.3) | Temporarily disables every user plugin except the undo system so DSH can always boot; entering auto-snapshots and backs up the config, exiting restores it; chat tool / WebUI button / offline CLI |
+| **Restart notice** (v0.3) | When a rollback touches plugin code or the mount config, clearly says "a DSH restart is required" |
 | **Crash self-check** | Detects when the previous DSH run crashed before finishing startup, warns in the snapshot list and panel, and suggests rolling back to the last good state |
 | **Export / import** | One-click ZIP export of all snapshots (backup / moving machines); import restores into the right store by kind and skips duplicates; panel buttons, chat tools and offline CLI all supported |
-| **Offline tools** | CLI (`snapshot/undo/redo/restore/remove/list/diff/prune/export/import/status`) + **GUI window v2** (crash banner with one-click rollback, export/import, double-click diff preview, clean-up, settings panel, system tray) + safe plugin-install wrapper |
+| **Desktop shortcut** (v0.2.1) | Double-click `tools/make-desktop-shortcut.bat` to put a "DSH Undo Manager" shortcut on the desktop — never lose track of the external tools again |
+| **Offline tools** | CLI (`snapshot/undo/redo/restore/remove/list/diff/prune/export/import/status/safe-mode`) + **GUI window v2** (crash banner with one-click rollback, export/import, double-click diff preview, clean-up, settings panel, system tray) + safe plugin-install wrapper |
 
 ## What is snapshotted & where
 
