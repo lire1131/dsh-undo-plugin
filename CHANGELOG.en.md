@@ -2,6 +2,13 @@
 
 Notable changes to dsh-undo-savepoint. Dates are in local time (UTC+8). 中文版:[CHANGELOG.md](CHANGELOG.md)
 
+## [0.3.0] - 2026-08-15
+
+### Added (safety net: crash attribution + safe mode + restart notice, phase 2)
+- **Crash attribution upgrade**: the `.booting` marker becomes `boot-state.json` (per-run result + last-good-boot timestamp); after an abnormal exit, `undo_list` and the WebUI name the **concrete last-known-good snapshot** with a one-click rollback button
+- **One-click SAFE MODE**: `undo_safe_mode` tool (usable in chat) + WebUI "Safe mode" button in the snapshot panel + offline CLI `safe-mode on|off|status` — entering auto-snapshots, backs up `cordis.patch.yml` and minimizes the patch (undo only) so DSH can always boot; exiting restores the previous set. Ultimate fallback when DSH cannot boot at all
+- **Restart notice**: when an undo/redo/restore touches plugin code or the mount config, the report and WebUI clearly say "a DSH restart is required"; the rollback log records it too
+
 ## [0.2.1] - 2026-08-15
 
 ### Added

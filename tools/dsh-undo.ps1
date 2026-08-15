@@ -17,7 +17,7 @@
 
 param(
     [Parameter(Position = 0)]
-    [ValidateSet('snapshot', 'list', 'diff', 'restore', 'undo', 'redo', 'remove', 'prune', 'export', 'import', 'status', 'settings')]
+    [ValidateSet('snapshot', 'list', 'diff', 'restore', 'undo', 'redo', 'remove', 'prune', 'export', 'import', 'status', 'settings', 'safe-mode')]
     [string]$Command = 'status',
     [string]$Label = '',
     [string]$Id = '',
@@ -119,5 +119,16 @@ switch ($Command) {
     'settings' {
         $settings = Get-UndoSettings
         $settings | ConvertTo-Json
+    }
+    'safe-mode' {
+        if ($Label -eq 'on' -or $Label -eq 'off') {
+            $r = Set-UndoSafeMode ($Label -eq 'on')
+            if (-not $r.ok) { Write-Host "safe-mode failed: $($r.error)"; exit 1 }
+            Write-Host $r.message
+        } else {
+            $st = Get-UndoSafeModeState
+            if ($st.active) { Write-Host "Safe mode is ON (entered $($st.enteredAt), backup $($st.backup))" }
+            else { Write-Host 'Safe mode is OFF.' }
+        }
     }
 }

@@ -2,6 +2,13 @@
 
 dsh-undo-savepoint 的重要变更。日期为本地时间(UTC+8)。English version: [CHANGELOG.en.md](CHANGELOG.en.md)
 
+## [0.3.0] - 2026-08-15
+
+### 新增（兜底三件套：崩溃归因 + 安全模式 + 重启联动，第 2 期）
+- **崩溃归因升级**:`.booting` 标记升级为 `boot-state.json`,记录每次启动的结果与"最后正常启动时间";上次异常退出时,`undo_list` 与 WebUI 直接给出**具体的最后正常快照 id 与一键回退按钮**,不再只说"上次崩溃了"
+- **一键安全模式**:`undo_safe_mode` 工具(对话可直接用)+ WebUI 快照面板「安全模式」按钮 + 离线 CLI `safe-mode on|off|status`——进入时自动手动快照并备份 `cordis.patch.yml`,把 patch 最小化(只留撤销系统),保证 DSH 一定能启动;退出时恢复原配置。DSH 完全起不来时的终极兜底
+- **重启联动**:undo/redo/restore 涉及插件代码或挂载配置时,报告与 WebUI 明确提示"重启 DSH 后生效",回滚日志同步记录
+
 ## [0.2.1] - 2026-08-15
 
 ### 新增

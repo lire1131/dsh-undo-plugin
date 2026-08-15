@@ -182,6 +182,46 @@ function Read-UndoBlob([string]$Hash) {
     return $null
 }
 
+# ── SAFE MODE (v0.3, module 4): disable all user plugins except undo ──────
+# State file: <autoDir>/safe-mode.json. Entering backs up cordis.patch.yml and
+# writes a minimal patch; exiting restores the backup. Works OFFLINE (when DSH
+# cannot boot at all: dsh-undo.ps1 safe-mode -Label on still works).
+function Get-UndoSafeModeState {
+    $settings = Get-UndoSettings
+    $stateFile = Join-Path $settings.autoDir 'safe-mode.json'
+    $st = @{ active = $false }
+    if (Test-Path -LiteralPath $stateFile) {
+        try { $st = Get-Content -LiteralPath $stateFile -Raw -Encoding UTF8 | ConvertFrom-Json } catch { }
+    }
+    return $st
+}
+
+function Set-UndoSafeMode([bool]$On) {
+    $settings = Get-UndoSettings
+    $patch = Join-Path $script:UndoProfileRoot 'cordis.patch.yml'
+    $stateFile = Join-Path $settings.autoDir 'safe-mode.json'
+    $st = Get-UndoSafeModeState
+    if ($On) {
+        if ($st.active) { return @{ ok = $true; active = $true; message = "Safe mode is already ON (entered $($st.enteredAt))." } }
+        $snap = New-UndoSnapshot 'manual' 'safe-mode-before'
+        $backup = Join-Path $settings.autoDir "safe-mode-backup-$($snap.id).yml"
+        if (Test-Path -LiteralPath $patch) { Copy-Item -LiteralPath $patch -Destination $backup -Force }
+        $minimal = "# dsh-undo-savepoint SAFE MODE (entered $(Get-Date -Format o))`n# All user plugins except dsh-undo-savepoint are temporarily disabled.`n- insert:`n    - id: dsh-undo-savepoint`n      name: dsh-undo-savepoint`n"
+        [System.IO.File]::WriteAllText($patch, $minimal, (New-Object System.Text.UTF8Encoding($false)))
+        New-Item -ItemType Directory -Force -Path $settings.autoDir | Out-Null
+        $stJson = @{ active = $true; enteredAt = (Get-Date).ToUniversalTime().ToString('o'); backup = $backup; snapshotId = $snap.id } | ConvertTo-Json -Depth 5
+        [System.IO.File]::WriteAllText($stateFile, $stJson, (New-Object System.Text.UTF8Encoding($false)))
+        return @{ ok = $true; active = $true; snapshotId = $snap.id; message = "Safe mode ON (pre-snapshot $($snap.id)). Restart DSH to boot with only dsh-undo-savepoint." }
+    }
+    if (-not $st.active) { return @{ ok = $true; active = $false; message = 'Safe mode is not active.' } }
+    if (-not $st.backup -or -not (Test-Path -LiteralPath $st.backup)) {
+        return @{ ok = $false; error = 'Safe-mode backup missing. Restore a snapshot from before the crash first (dsh-undo.ps1 list / restore).' }
+    }
+    Copy-Item -LiteralPath $st.backup -Destination $patch -Force
+    Remove-Item -LiteralPath $stateFile -Force -ErrorAction SilentlyContinue
+    return @{ ok = $true; active = $false; message = 'Safe mode OFF. Restart DSH to load all plugins again.' }
+}
+
 function Get-UndoSpecByName([string]$DestName) {
     foreach ($f in $script:UndoFileSpecs) { if ((Get-UndoDestName $f) -eq $DestName) { return $f } }
     return $null

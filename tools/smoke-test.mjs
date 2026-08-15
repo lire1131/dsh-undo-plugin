@@ -319,8 +319,16 @@ await run8('undo_snapshot', { reason: 'plugin-v1' });
 let out8 = await run8('undo_list', {});
 check(out8.includes('plugin file(s)'), 'list shows plugin file count');
 const manualDir8 = join(snap8, 'manual');
-const lastSnap8 = (await readdir(manualDir8)).sort().at(-1);
-const m8 = JSON.parse(await readFile(join(manualDir8, lastSnap8, 'manifest.json'), 'utf8'));
+// 按 reason 定位 v1 快照目录（同秒创建的快照排序不稳定，不能依赖目录名排序）
+let v1Snap8 = null;
+for (const d of await readdir(manualDir8)) {
+  try {
+    const mm = JSON.parse(await readFile(join(manualDir8, d, 'manifest.json'), 'utf8'));
+    if (mm.reason === 'plugin-v1') { v1Snap8 = d; break; }
+  } catch { /* skip */ }
+}
+check(!!v1Snap8, 'found plugin-v1 snapshot dir by reason');
+const m8 = JSON.parse(await readFile(join(manualDir8, v1Snap8, 'manifest.json'), 'utf8'));
 check(Array.isArray(m8.plugins) && m8.plugins.length === 1, 'manifest has one plugin entry');
 const pf8 = m8.plugins[0].files;
 check(pf8.some((f) => f.path === 'lib/index.js'), 'plugin code file referenced');
@@ -337,8 +345,7 @@ await writeFile(join(profile8, 'package.json'), '{"v":2}\n');
 await run8('undo_snapshot', { reason: 'plugin-v2' });
 check((await readdir(blobDir8)).length === 5, 'blob store dedup: only new contents added (3 -> 5)');
 // diff 用 v1 快照（当前是 v2 状态，与 v2 快照无差异）
-const firstSnap8 = (await readdir(manualDir8)).sort()[0];
-out8 = await run8('undo_diff', { snapshot_id: firstSnap8 });
+out8 = await run8('undo_diff', { snapshot_id: v1Snap8 });
 console.log('   ', out8.split('\n').find((l) => l.includes('plugin')) ?? '(no plugin line)');
 check(out8.includes('plugin plugin-fake/lib/index.js'), 'diff shows plugin file');
 check(out8.includes('profile ./router-global.mjs'), 'diff shows profile-local code file');
@@ -348,7 +355,73 @@ check((await readFile(join(plugin8, 'lib', 'index.js'), 'utf8')).includes('x = 1
 check((await readFile(join(profile8, 'router-global.mjs'), 'utf8')).includes('a = 1'), 'profile-local code restored');
 check((await readFile(join(profile8, 'package.json'), 'utf8')).includes('"v":1'), 'config restored together');
 check(out8.includes('plugin:plugin-fake/lib/index.js'), 'report lists the plugin file');
+check(out8.includes('restart of DSH'), 'report mentions restart requirement (v0.3)');
 await rm(root8, { recursive: true, force: true });
+
+console.log('== 17. crash attribution: stale boot-state -> last-good suggestion (v0.3) ==');
+const root9 = await mkdtemp(join(tmpdir(), 'dsh-undo-test9-'));
+const home9 = join(root9, 'home'), profile9 = join(root9, 'profile'), snap9 = join(root9, 'snaps');
+await mkdir(home9, { recursive: true }); await mkdir(profile9, { recursive: true });
+await mkdir(join(snap9, 'auto'), { recursive: true });
+// 模拟上次崩溃：ok=false，lastGoodAt 设为未来时间（所有快照都早于它）
+await writeFile(join(snap9, 'auto', 'boot-state.json'), JSON.stringify({ startedAt: '2026-01-01T00:00:00.000Z', pid: 1, ok: false, okAt: null, lastGoodAt: '2099-01-01T00:00:00.000Z' }));
+await writeFile(join(home9, 'settings.yaml'), 'model: x\n');
+await writeFile(join(profile9, 'cordis.patch.yml'), '# patch\n[]\n');
+const tools9 = new Map();
+const ctx9 = {
+  tools: { register: (t) => { tools9.set(t.name, t); return () => { }; } },
+  systemPrompt: { section: () => () => { } }, get: () => undefined,
+  effect: (fn) => { const d = fn(); return d ?? (() => { }); }, logger: { info: () => { }, warn: () => { } },
+};
+apply(ctx9, { manualDir: join(snap9, 'manual'), autoDir: join(snap9, 'auto'), homeDir: home9, profileDir: profile9, watch: false, pluginDirs: [] });
+await new Promise((r) => setTimeout(r, 300));
+const run9 = async (name, args) => (await tools9.get(name).execute(args, {}));
+let out9 = await run9('undo_list', {});
+check(out9.includes('did not finish starting'), 'crash alert shown after simulated crash');
+check(out9.includes('Last known-good snapshot:'), 'alert names a concrete last-good snapshot');
+check(out9.includes('undo_safe_mode'), 'alert mentions safe mode as fallback');
+const bs9 = JSON.parse(await readFile(join(snap9, 'auto', 'boot-state.json'), 'utf8'));
+check(bs9.ok === false && bs9.pid > 0, 'boot-state.json rewritten for this run (ok=false until 30s)');
+await rm(root9, { recursive: true, force: true });
+
+console.log('== 18. safe mode on/off roundtrip (v0.3) ==');
+const root10 = await mkdtemp(join(tmpdir(), 'dsh-undo-test10-'));
+const home10 = join(root10, 'home'), profile10 = join(root10, 'profile'), snap10 = join(root10, 'snaps');
+await mkdir(home10, { recursive: true }); await mkdir(profile10, { recursive: true });
+await writeFile(join(home10, 'settings.yaml'), 'model: x\n');
+const originalPatch10 = '# patch\n- insert:\n    - id: whale\n      name: dsh-whale-kit\n';
+await writeFile(join(profile10, 'cordis.patch.yml'), originalPatch10);
+const tools10 = new Map();
+const ctx10 = {
+  tools: { register: (t) => { tools10.set(t.name, t); return () => { }; } },
+  systemPrompt: { section: () => () => { } }, get: () => undefined,
+  effect: (fn) => { const d = fn(); return d ?? (() => { }); }, logger: { info: () => { }, warn: () => { } },
+};
+apply(ctx10, { manualDir: join(snap10, 'manual'), autoDir: join(snap10, 'auto'), homeDir: home10, profileDir: profile10, watch: false, pluginDirs: [] });
+await new Promise((r) => setTimeout(r, 300));
+const run10 = async (name, args) => (await tools10.get(name).execute(args, {}));
+let out10 = await run10('undo_safe_mode', { action: 'on' });
+console.log('   ', out10.split('\n')[0]);
+check(out10.includes('Safe mode ON'), 'safe mode entered');
+const patchOn10 = await readFile(join(profile10, 'cordis.patch.yml'), 'utf8');
+check(patchOn10.includes('SAFE MODE') && !patchOn10.includes('dsh-whale-kit'), 'patch minimized (only undo remains)');
+const smState10 = JSON.parse(await readFile(join(snap10, 'auto', 'safe-mode.json'), 'utf8'));
+check(smState10.active === true && !!smState10.backup && !!smState10.snapshotId, 'safe-mode state file recorded');
+let backupOk = false;
+try { await readFile(smState10.backup, 'utf8'); backupOk = true; } catch { /* missing */ }
+check(backupOk, 'patch backup file exists');
+out10 = await run10('undo_safe_mode', { action: 'on' });
+check(out10.includes('already ON'), 're-entering safe mode is idempotent');
+out10 = await run10('undo_safe_mode', { action: 'status' });
+check(out10.includes('Safe mode is ON'), 'status reports ON');
+out10 = await run10('undo_safe_mode', { action: 'off' });
+console.log('   ', out10.split('\n')[0]);
+check(out10.includes('Safe mode OFF'), 'safe mode exited');
+const patchOff10 = await readFile(join(profile10, 'cordis.patch.yml'), 'utf8');
+check(patchOff10 === originalPatch10, 'patch restored to original content');
+out10 = await run10('undo_safe_mode', { action: 'status' });
+check(out10.includes('OFF'), 'status reports OFF after exit');
+await rm(root10, { recursive: true, force: true });
 
 await rm(root, { recursive: true, force: true });
 console.log(`\n== RESULT: ${pass} passed, ${fail} failed ==`);
