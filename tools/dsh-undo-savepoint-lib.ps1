@@ -854,24 +854,15 @@ function Get-UndoDiffText([string]$Id) {
         if (-not $hasSnap -and -not $hasCur) { continue }
         if ($hasSnap -and -not $hasCur) { [void]$sb.AppendLine("$((Get-UndoDestName $f)): file did not exist at snapshot time"); continue }
         if (-not $hasSnap -and $hasCur) { [void]$sb.AppendLine("$((Get-UndoDestName $f)): NEW file (absent in snapshot)"); continue }
-        # sensitive files (v0.3.2): prefer the vault real value so the diff shows real differences
-        $snapContent = $snapPath
-        if (Test-UndoSensitiveName (Get-UndoDestName $f)) {
-            $vaultRef = $null
-            if ($null -ne $target.envVaultRefs) {
-                try { $vaultRef = $target.envVaultRefs.PSObject.Properties[(Get-UndoDestName $f)].Value } catch { }
-            }
-            if ($vaultRef) {
-                $real = Read-UndoVault $vaultRef
-                if ($real) { $snapContent = $real }
-            }
-        }
-        $a = @(Get-Content -LiteralPath $snapContent)
+        # sensitive files (v0.3.2): diff always shows the redacted snapshot
+        # content (zero leak in the UI); restore pulls real values from vault
+        $a = @(Get-Content -LiteralPath $snapPath)
         $b = @(Get-Content -LiteralPath $curPath)
         $onlyA = @($a | Where-Object { $_ -notin $b })
         $onlyB = @($b | Where-Object { $_ -notin $a })
         if (@($onlyA).Count -eq 0 -and @($onlyB).Count -eq 0) { continue }
         [void]$sb.AppendLine("$((Get-UndoDestName $f)): +$(@($onlyB).Count) -$(@($onlyA).Count)")
+        if (Test-UndoSensitiveName (Get-UndoDestName $f)) { [void]$sb.AppendLine('  (sensitive values are redacted in diffs; restore pulls real values from the local vault)') }
         foreach ($l in ($onlyA | Select-Object -First 20)) { [void]$sb.AppendLine("  - $l") }
         foreach ($l in ($onlyB | Select-Object -First 20)) { [void]$sb.AppendLine("  + $l") }
     }

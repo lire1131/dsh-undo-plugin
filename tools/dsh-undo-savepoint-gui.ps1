@@ -224,17 +224,18 @@ function New-ToolButton([string]$Text, [int]$Width, [scriptblock]$OnClick) {
     return $btn
 }
 
-$btnSave = New-ToolButton $script:UI.btnSave 110 { Save-Snapshot }
-$btnUndo = New-ToolButton $script:UI.btnUndo 90 { Invoke-QuickUndo 'undo' }
-$btnRedo = New-ToolButton $script:UI.btnRedo 90 { Invoke-QuickUndo 'redo' }
-$btnRestore = New-ToolButton $script:UI.btnRestore 120 { Restore-Selected }
-$btnDelete = New-ToolButton $script:UI.btnDelete 120 { Delete-Selected }
-$btnRefresh = New-ToolButton $script:UI.btnRefresh 90 { Update-List }
-$btnCleanup = New-ToolButton $script:UI.btnCleanup 110 { Cleanup-Now }
-$btnExport = New-ToolButton $script:UI.btnExport 100 { Export-Now }
-$btnImport = New-ToolButton $script:UI.btnImport 100 { Import-Now }
-$btnSettings = New-ToolButton $script:UI.btnSettings 100 { Show-Settings }
-$btnSafeMode = New-ToolButton $script:UI.btnSafeMode 110 { Toggle-SafeMode }
+$btnSave = New-ToolButton $script:UI.btnSave 95 { Save-Snapshot }
+$btnUndo = New-ToolButton $script:UI.btnUndo 85 { Invoke-QuickUndo 'undo' }
+$btnRedo = New-ToolButton $script:UI.btnRedo 85 { Invoke-QuickUndo 'redo' }
+$btnRestore = New-ToolButton $script:UI.btnRestore 100 { Restore-Selected }
+$btnDelete = New-ToolButton $script:UI.btnDelete 100 { Delete-Selected }
+$btnRefresh = New-ToolButton $script:UI.btnRefresh 80 { Update-List }
+$btnCleanup = New-ToolButton $script:UI.btnCleanup 95 { Cleanup-Now }
+$btnExport = New-ToolButton $script:UI.btnExport 90 { Export-Now }
+$btnImport = New-ToolButton $script:UI.btnImport 90 { Import-Now }
+$btnSettings = New-ToolButton $script:UI.btnSettings 90 { Show-Settings }
+$btnSafeMode = New-ToolButton $script:UI.btnSafeMode 95 { Toggle-SafeMode }
+$toolbar.AutoScroll = $true # v0.3.2: window smaller than the toolbar -> scroll instead of hiding buttons
 
 $toolbar.Controls.Add($btnSave)
 $toolbar.Controls.Add($btnUndo)

@@ -494,6 +494,11 @@ check((await readFile(join(vaultDir12, m12.envVaultRefs['home-.env'] + '.env'), 
 // 2) 本机完整回滚：改 .env → undo → 真实值还原
 await writeFile(join(home12, '.env'), '# vision api\nAPI_KEY=changed-value\nexport TOKEN="other"\nEMPTY=\n');
 await run12('undo_snapshot', { reason: 's2' });
+// diff 预览一致性：敏感值脱敏显示（v0.3.2，WebUI 与离线工具同行为）
+const s1Dir12 = (await readdir(join(snap12, 'manual'))).find((d) => d !== '.booting');
+out = await run12('undo_diff', { snapshot_id: s1Dir12 });
+check(out.includes('redacted in diffs'), 'diff notes sensitive redaction');
+check(!out.includes('kfc-vw50'), 'diff never leaks the real value');
 out = await run12('undo_restore', { mode: 'undo' });
 check((await readFile(join(home12, '.env'), 'utf8')) === originalEnv12, 'local rollback restores real .env values (vault)');
 // 3) 换机模拟：删 vault → 恢复 → 占位 + 提示
