@@ -2,6 +2,26 @@
 
 dsh-undo-savepoint 的重要变更。日期为本地时间(UTC+8)。English version: [CHANGELOG.en.md](CHANGELOG.en.md)
 
+## [0.3.2] - 2026-08-15
+
+### 新增
+- **敏感信息脱敏 + 本机 vault**（默认开启）：`.env` 与 `.credentials.yaml` 进快照时值替换为 `***REDACTED***`（键名/export/引号/注释/结构全保留），快照与导出 ZIP 可自由外传零泄露；真实值存本机 vault（`<autoDir>/env-vault/`，内容寻址），**本机回滚完整还原含值**，换机回滚得到占位 + 提示填写
+  - `sensitiveMode` 设置：`redact`（默认）/ `keep`（明文旧行为）；旧快照自动兼容
+  - 设置项与离线 CLI `settings` 同步支持
+- **局外急救补齐**（DSH 挂了也能救全）：
+  - **GUI 崩溃横幅升级**：读 boot-state.json（旧逻辑查已废弃的 .booting，v0.3 后失效已修复），显示 last-good 快照 + 一键回退到该快照
+  - **GUI 一键安全模式按钮**：on/off/状态确认框（此前只有 CLI 有）
+  - **CLI 新增 `recent` 命令**：查看回滚日志（WebUI 的 undo_recent 对等能力）
+  - **CLI `settings -Label "key=value;..."`**：离线修改设置（此前只读）
+  - **CLI undo/redo/restore 输出增强**：needsRestart / 跨机 preflight 警告 / 脱敏占位 Note 提示
+- `.credentials.yaml` 纳入快照范围（此前不在——DSH 真凭据文件损坏时局内外都救不了）
+
+### 修复
+- ps1 `Get-UndoBootAlert` 升级为读 boot-state.json（含 lastGoodAt），新增 `Get-UndoLastGoodId`
+
+### 测试
+- smoke 76 → 91（脱敏规则各形态 / vault 本机完整恢复 / 换机占位 / keep 明文 / 旧快照兼容）；e2e 10/10
+
 ## [0.3.1] - 2026-08-15
 
 ### 新增

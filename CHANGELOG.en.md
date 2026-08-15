@@ -2,6 +2,26 @@
 
 Notable changes to dsh-undo-savepoint. Dates are in local time (UTC+8). 中文版:[CHANGELOG.md](CHANGELOG.md)
 
+## [0.3.2] - 2026-08-15
+
+### Added
+- **Sensitive-info redaction + local vault** (on by default): `.env` and `.credentials.yaml` enter snapshots with values replaced by `***REDACTED***` (keys / `export` / quotes / comments / structure fully preserved) — snapshots and exported ZIPs are safe to share; the real values live in a local vault (`<autoDir>/env-vault/`, content-addressed), so **local rollbacks restore values completely**, while cross-machine rollbacks yield placeholders with a clear note
+  - `sensitiveMode` setting: `redact` (default) / `keep` (plaintext legacy); old snapshots stay compatible
+  - exposed via settings and the offline CLI `settings` command
+- **Offline emergency tooling completed** (everything needed when DSH is down):
+  - **GUI crash banner fixed & upgraded**: reads `boot-state.json` (the old `.booting` check silently broke after v0.3), shows the last-known-good snapshot with one-click rollback to that exact snapshot
+  - **GUI one-click SAFE MODE button** (on/off with confirmation; previously CLI-only)
+  - **CLI `recent` command**: rollback log viewer (WebUI `undo_recent` counterpart)
+  - **CLI `settings -Label "key=value;..."`**: edit settings offline (previously read-only)
+  - **CLI undo/redo/restore output enriched**: needsRestart / cross-machine preflight warning / redacted-placeholder notes
+- `.credentials.yaml` added to the snapshot scope (it was missing before — a broken credentials file was unrecoverable both in-UI and offline)
+
+### Fixed
+- ps1 `Get-UndoBootAlert` upgraded to read `boot-state.json` (incl. `lastGoodAt`); new `Get-UndoLastGoodId`
+
+### Tests
+- smoke 76 → 91 (redaction shapes / vault full local restore / cross-machine placeholder / keep plaintext / old-snapshot compat); e2e 10/10
+
 ## [0.3.1] - 2026-08-15
 
 ### Added

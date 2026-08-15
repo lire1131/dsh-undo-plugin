@@ -34,6 +34,8 @@ An undo/rollback system for [DeepSeek Harness (DSH)](https://github.com/deepseek
 | **Undo/redo stack** | Multiple consecutive undos; redo re-applies the pre-undo state (blocked when newer changes exist); every restore first preserves the current state as a "pre-restore" snapshot |
 | **Plugin-code rollback** (v0.2) | Snapshots include user-plugin code trees (`D:\dsh\plugins\*` and profile-local code files) — a broken plugin edit is undoable even when no config file changed; content-addressed blob dedup with 4 size safeguards (whitelist / dedup / caps / restore-by-reference) |
 | **Cross-machine preflight** (v0.3.1) | Restore scans the snapshot's plugin references and clearly lists any that this machine cannot resolve (multi-anchor probing avoids false positives); see [docs/migration.en.md](docs/migration.en.md) for the migration guide |
+| **Sensitive-info redaction** (v0.3.2) | `.env` / `.credentials.yaml` enter snapshots with values replaced by `***REDACTED***` (structure preserved) — snapshots and exported ZIPs are safe to share; real values live in a local vault, **local rollbacks restore them fully**, cross-machine rollbacks yield placeholders + notes; `sensitiveMode` can switch to `keep` (plaintext) |
+| **Complete offline emergency kit** (v0.3.2) | GUI: crash banner (last-good one-click rollback) + **SAFE MODE button**; CLI: `recent` rollback log, `settings -Set` offline editing, restore output with needsRestart / preflight / redaction notes — everything needed when DSH is down |
 | **Crash attribution** (v0.3) | After an abnormal exit, names the concrete last-known-good snapshot with a one-click rollback button |
 | **One-click SAFE MODE** (v0.3) | Temporarily disables every user plugin except the undo system so DSH can always boot; entering auto-snapshots and backs up the config, exiting restores it; chat tool / WebUI button / offline CLI |
 | **Restart notice** (v0.3) | When a rollback touches plugin code or the mount config, clearly says "a DSH restart is required" |
@@ -41,6 +43,18 @@ An undo/rollback system for [DeepSeek Harness (DSH)](https://github.com/deepseek
 | **Export / import** | One-click ZIP export of all snapshots (backup / moving machines); import restores into the right store by kind and skips duplicates; panel buttons, chat tools and offline CLI all supported |
 | **Desktop shortcut** (v0.2.1) | Double-click `tools/make-desktop-shortcut.bat` to put a "DSH Undo Manager" shortcut on the desktop — never lose track of the external tools again |
 | **Offline tools** | CLI (`snapshot/undo/redo/restore/remove/list/diff/prune/export/import/status/safe-mode`) + **GUI window v2** (crash banner with one-click rollback, export/import, double-click diff preview, clean-up, settings panel, system tray) + safe plugin-install wrapper |
+
+## Crash rescue quick reference (pick by scenario)
+
+| Scenario | Action |
+|---|---|
+| Config/plugin mount broken | Chat / WebUI / CLI: `undo` or `restore -Id <id>` |
+| Plugin code broken | Same (snapshots include plugin code trees, one-click restore) |
+| Last run crashed, unsure what to roll back to | WebUI / GUI banner shows the last-known-good snapshot, one-click rollback |
+| **DSH will not boot at all** | Desktop "DSH Undo Manager" → **SAFE MODE** button (or CLI `safe-mode -Label on`) → restart DSH, it always boots |
+| Missing plugins after restore (cross-machine) | Preflight warning in the restore report; install first or use safe mode |
+| "My config suddenly changed" | CLI `recent` / chat `undo_recent` check the rollback log |
+| Rollback touched plugins/mounts | Report says "restart DSH for it to take effect" |
 
 ## What is snapshotted & where
 

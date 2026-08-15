@@ -17,7 +17,7 @@
 
 param(
     [Parameter(Position = 0)]
-    [ValidateSet('snapshot', 'list', 'diff', 'restore', 'undo', 'redo', 'remove', 'prune', 'export', 'import', 'status', 'settings', 'safe-mode')]
+    [ValidateSet('snapshot', 'list', 'diff', 'restore', 'undo', 'redo', 'remove', 'prune', 'export', 'import', 'status', 'settings', 'safe-mode', 'recent')]
     [string]$Command = 'status',
     [string]$Label = '',
     [string]$Id = '',
@@ -42,12 +42,22 @@ switch ($Command) {
         Write-Host "Files: $($r.restored -join ', ')"
         Write-Host "Pre-restore safety snapshot: $($r.preSnapshotId) (redo target)"
         if ($r.remounted) { Write-Host 'dsh-undo mount re-ensured in cordis.patch.yml' }
+        if ($r.missing -and @($r.missing).Count -gt 0) { Write-Host "Not restored: $($r.missing -join ', ')" }
+        if ($r.needsRestart) { Write-Host 'NOTE: a restart of DSH is required for the restored state to take effect.' }
+        if ($r.preflight -and @($r.preflight.missing).Count -gt 0) {
+            Write-Host "WARNING Cross-machine preflight: not resolvable on this machine: $($r.preflight.missing -join ', ')"
+            Write-Host 'DSH may fail to start after restore - install them first, or run: dsh-undo.ps1 safe-mode -Label on'
+        }
+        foreach ($n in @($r.notes)) { Write-Host "Note: $n" }
     }
     'redo' {
         $r = Invoke-UndoRestore 'redo' ''
         if (-not $r.ok) { Write-Host "redo failed: $($r.error)"; exit 1 }
         Write-Host "Redone: re-applied $($r.targetId)"
         Write-Host "Files: $($r.restored -join ', ')"
+        if ($r.missing -and @($r.missing).Count -gt 0) { Write-Host "Not restored: $($r.missing -join ', ')" }
+        if ($r.needsRestart) { Write-Host 'NOTE: a restart of DSH is required for the restored state to take effect.' }
+        foreach ($n in @($r.notes)) { Write-Host "Note: $n" }
     }
     'list' {
         $list = Get-UndoSnapshots
@@ -80,6 +90,12 @@ switch ($Command) {
         Write-Host "Pre-restore safety snapshot: $($r.preSnapshotId)"
         if ($r.remounted) { Write-Host 'dsh-undo mount re-ensured in cordis.patch.yml' }
         if ($r.missing -and @($r.missing).Count -gt 0) { Write-Host "Not restored: $($r.missing -join ', ')" }
+        if ($r.needsRestart) { Write-Host 'NOTE: a restart of DSH is required for the restored state to take effect.' }
+        if ($r.preflight -and @($r.preflight.missing).Count -gt 0) {
+            Write-Host "WARNING Cross-machine preflight: not resolvable on this machine: $($r.preflight.missing -join ', ')"
+            Write-Host 'DSH may fail to start after restore - install them first, or run: dsh-undo.ps1 safe-mode -Label on'
+        }
+        foreach ($n in @($r.notes)) { Write-Host "Note: $n" }
     }
     'remove' {
         if ([string]::IsNullOrEmpty($Id)) { throw 'remove requires -Id <id>' }
@@ -118,7 +134,39 @@ switch ($Command) {
     }
     'settings' {
         $settings = Get-UndoSettings
-        $settings | ConvertTo-Json
+        if ($Label) {
+            # settings -Label "key=value;key2=value2" (v0.3.2: offline editing)
+            $new = @{}
+            foreach ($pair in ($Label -split ';')) {
+                $kv = $pair -split '=', 2
+                if ($kv.Count -ne 2 -or [string]::IsNullOrWhiteSpace($kv[0])) { continue }
+                $key = $kv[0].Trim()
+                $val = $kv[1].Trim()
+                if ($val -eq 'true') { $new[$key] = $true }
+                elseif ($val -eq 'false') { $new[$key] = $false }
+                elseif ($val -match '^\d+$') { $new[$key] = [int]$val }
+                else { $new[$key] = $val }
+            }
+            if ($new.Count -eq 0) { Write-Host 'settings: no valid key=value pairs in -Label'; exit 1 }
+            $saved = Set-UndoSettings $new
+            Write-Host 'Settings updated:'
+            $saved | ConvertTo-Json
+        } else {
+            $settings | ConvertTo-Json
+        }
+    }
+    'recent' {
+        $limit = if ($KeepAuto -gt 0) { [Math]::Min(20, $KeepAuto) } else { 5 }
+        $log = Join-Path (Split-Path $script:UndoSettingsFile -Parent) 'rollback-log.jsonl'
+        if (-not (Test-Path -LiteralPath $log)) { Write-Host 'No rollback operations recorded yet.'; break }
+        $lines = @(Get-Content -LiteralPath $log -Encoding UTF8 | Select-Object -Last $limit)
+        Write-Host 'Recent rollback operations (newest first):'
+        foreach ($l in ($lines | Select-Object -Last $limit)) {
+            try {
+                $e = $l | ConvertFrom-Json
+                Write-Host ("{0}  {1}  -> {2}  files: {3}" -f $e.ts, $e.mode, $e.targetId, (@($e.files) -join ', '))
+            } catch { Write-Host '(unreadable entry)' }
+        }
     }
     'safe-mode' {
         if ($Label -eq 'on' -or $Label -eq 'off') {

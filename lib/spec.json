@@ -5,7 +5,8 @@
     { "root": "profile", "rel": "cordis.yml" },
     { "root": "profile", "rel": "pnpm-workspace.yaml" },
     { "root": "home", "rel": "settings.yaml" },
-    { "root": "home", "rel": ".env" }
+    { "root": "home", "rel": ".env" },
+    { "root": "home", "rel": ".credentials.yaml" }
   ],
   "pluginCodeExts": [".js", ".mjs", ".cjs", ".ts", ".mts", ".cts", ".json", ".yml", ".yaml"],
   "pluginExcludeDirNames": ["node_modules", ".git", "dist", "build", "cache", ".cache", "coverage", ".turbo"],

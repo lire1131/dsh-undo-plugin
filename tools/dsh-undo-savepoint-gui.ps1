@@ -56,6 +56,15 @@ if ($script:IsZh) {
         deleted = '已删除快照 {0}'
         bootBanner = '⚠️ 检测到上次 DSH 异常退出,建议回退到上次正常状态'
         bootRollback = '回退到上次正常状态'
+        btnSafeMode = '安全模式'
+        safeModeOnTitle = '开启安全模式'
+        safeModeOnConfirm = '除撤销系统外的所有用户插件将被临时禁用(先自动快照并备份配置),重启 DSH 后生效。继续?'
+        safeModeOffTitle = '退出安全模式'
+        safeModeOffConfirm = '恢复进入安全模式前的完整插件配置,重启 DSH 后生效。继续?'
+        safeModeOn = '安全模式已开启。重启 DSH 后仅加载撤销系统。'
+        safeModeOff = '安全模式已退出。重启 DSH 后恢复全部插件。'
+        safeModeFail = '安全模式操作失败: {0}'
+        restartRequired = '已回退。重启 DSH 后恢复内容才会生效。'
         exported = '已导出 {0} 个快照 → {1}'
         exportFail = '导出失败: {0}'
         imported = '已导入 {0} 个快照({1} 个重复跳过)'
@@ -116,6 +125,15 @@ if ($script:IsZh) {
         deleted = 'Deleted snapshot {0}'
         bootBanner = '⚠️ Previous DSH run exited abnormally - consider rolling back to the last good state'
         bootRollback = 'Roll back to the last good state'
+        btnSafeMode = 'Safe mode'
+        safeModeOnTitle = 'Enable SAFE MODE'
+        safeModeOnConfirm = 'All user plugins except the undo system will be temporarily disabled (a snapshot and config backup are taken first). Takes effect after a DSH restart. Continue?'
+        safeModeOffTitle = 'Exit SAFE MODE'
+        safeModeOffConfirm = 'The full plugin set from before safe mode will be restored. Takes effect after a DSH restart. Continue?'
+        safeModeOn = 'Safe mode ON. Restart DSH to boot with only the undo system.'
+        safeModeOff = 'Safe mode OFF. Restart DSH to load all plugins again.'
+        safeModeFail = 'Safe mode failed: {0}'
+        restartRequired = 'Rolled back. A DSH restart is required for the restored state to take effect.'
         exported = 'Exported {0} snapshot(s) → {1}'
         exportFail = 'Export failed: {0}'
         imported = 'Imported {0} snapshot(s) ({1} duplicate(s) skipped)'
@@ -216,6 +234,7 @@ $btnCleanup = New-ToolButton $script:UI.btnCleanup 110 { Cleanup-Now }
 $btnExport = New-ToolButton $script:UI.btnExport 100 { Export-Now }
 $btnImport = New-ToolButton $script:UI.btnImport 100 { Import-Now }
 $btnSettings = New-ToolButton $script:UI.btnSettings 100 { Show-Settings }
+$btnSafeMode = New-ToolButton $script:UI.btnSafeMode 110 { Toggle-SafeMode }
 
 $toolbar.Controls.Add($btnSave)
 $toolbar.Controls.Add($btnUndo)
@@ -227,6 +246,7 @@ $toolbar.Controls.Add($btnCleanup)
 $toolbar.Controls.Add($btnExport)
 $toolbar.Controls.Add($btnImport)
 $toolbar.Controls.Add($btnSettings)
+$toolbar.Controls.Add($btnSafeMode)
 
 # list
 $list = New-Object System.Windows.Forms.ListView
@@ -383,11 +403,33 @@ function Show-Diff([string]$Id) {
 }
 
 function Boot-Rollback {
-    $r = Invoke-UndoRestore 'undo' ''
+    # v0.3: roll back to the concrete last-known-good snapshot when known
+    $goodId = $script:lastGoodId
+    if ($goodId) {
+        $r = Invoke-UndoRestore 'id' $goodId
+    } else {
+        $r = Invoke-UndoRestore 'undo' ''
+    }
     if (-not $r.ok) { Set-Status ($script:UI.fail -f $r.error); return }
     if ($r.unchanged) { Set-Status $r.message; return }
     Set-Status ($script:UI.undone -f $r.targetId, $r.preSnapshotId)
+    if ($r.needsRestart) { [void][System.Windows.Forms.MessageBox]::Show($script:UI.restartRequired, 'DSH Undo', 'OK', 'Information') }
     Update-List
+}
+
+function Toggle-SafeMode {
+    # v0.3.2: one-click SAFE MODE in the offline GUI (the tool that saves you
+    # when DSH cannot boot at all)
+    $st = Get-UndoSafeModeState
+    $on = [bool]$st.active
+    if ($on) {
+        if ([System.Windows.Forms.MessageBox]::Show($script:UI.safeModeOffConfirm, $script:UI.safeModeOffTitle, 'YesNo', 'Warning') -ne 'Yes') { return }
+    } else {
+        if ([System.Windows.Forms.MessageBox]::Show($script:UI.safeModeOnConfirm, $script:UI.safeModeOnTitle, 'YesNo', 'Warning') -ne 'Yes') { return }
+    }
+    $r = Set-UndoSafeMode (-not $on)
+    if (-not $r.ok) { Set-Status ($script:UI.safeModeFail -f $r.error); return }
+    if ($r.active) { Set-Status $script:UI.safeModeOn } else { Set-Status $script:UI.safeModeOff }
 }
 
 function Show-Settings {
@@ -496,6 +538,11 @@ $form.Add_FormClosing({
 
 $form.Add_Shown({
     Update-List
-    if (Get-UndoBootAlert) { $banner.Visible = $true }
+    $boot = Get-UndoBootAlert
+    if ($boot.crashed) {
+        # v0.3: remember the concrete last-known-good snapshot for one-click rollback
+        $script:lastGoodId = Get-UndoLastGoodId
+        $banner.Visible = $true
+    }
 })
 [System.Windows.Forms.Application]::Run($form)

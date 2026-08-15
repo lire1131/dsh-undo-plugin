@@ -25,8 +25,16 @@ $script:UndoFileSpecs = @(
     @{ RootKey = 'profile'; Root = $script:UndoProfileRoot; Name = 'cordis.yml' },
     @{ RootKey = 'profile'; Root = $script:UndoProfileRoot; Name = 'pnpm-workspace.yaml' },
     @{ RootKey = 'home';    Root = $script:UndoHomeRoot;    Name = 'settings.yaml' },
-    @{ RootKey = 'home';    Root = $script:UndoHomeRoot;    Name = '.env' }
+    @{ RootKey = 'home';    Root = $script:UndoHomeRoot;    Name = '.env' },
+    @{ RootKey = 'home';    Root = $script:UndoHomeRoot;    Name = '.credentials.yaml' }
 )
+
+# ── sensitive-file handling (v0.3.2): redact + local vault ─────────────────
+# Sensitive files (.env / .credentials.yaml) go into snapshots REDACTED; the
+# real values live in the local vault (<autoDir>/env-vault/<sha1>.env) so
+# local rollbacks restore fully while exported snapshots carry no secrets.
+$script:UndoSensitiveDests = @('home-.env', 'profile-.env', 'home-.credentials.yaml')
+$script:UndoRedactPlaceholder = '***REDACTED***'
 
 # ── plugin code tree rules (v0.2, module 1) ────────────────────────────────
 # Defaults mirror lib/spec.json; Initialize-UndoSpec overrides them when the
@@ -182,6 +190,61 @@ function Read-UndoBlob([string]$Hash) {
     return $null
 }
 
+# ── sensitive-file redaction + vault (v0.3.2) ──────────────────────────────
+function Test-UndoSensitiveName([string]$DestName) {
+    return ($script:UndoSensitiveDests -contains $DestName)
+}
+function Test-UndoRedacting {
+    $settings = Get-UndoSettings
+    return ($settings.sensitiveMode -ne 'keep')
+}
+# .env line-level redaction: keep key / export / quotes / comments, replace value.
+function Get-UndoRedactedEnv([string]$Text) {
+    $out = @()
+    foreach ($line in ($Text -split "`r?`n")) {
+        if ($line -match '^(\s*(?:export\s+)?[A-Za-z_][A-Za-z0-9_.]*)(\s*=\s*)(.*)$') {
+            $val = $matches[3]
+            $quote = ''
+            if ($val.StartsWith('"')) { $quote = '"' } elseif ($val.StartsWith("'")) { $quote = "'" }
+            $out += "$($matches[1])$($matches[2])$quote$($script:UndoRedactPlaceholder)$quote"
+        } else {
+            $out += $line
+        }
+    }
+    return ($out -join "`n")
+}
+# YAML key-value redaction (.credentials.yaml): keep indent/key, replace value.
+function Get-UndoRedactedYaml([string]$Text) {
+    $out = @()
+    foreach ($line in ($Text -split "`r?`n")) {
+        if ($line -match '^(\s*[A-Za-z_][A-Za-z0-9_.-]*\s*:\s*)(.*)$') {
+            $val = $matches[2].Trim()
+            if ($val -ne '' -and -not $val.StartsWith('#')) {
+                $out += "$($matches[1])$($script:UndoRedactPlaceholder)"
+                continue
+            }
+        }
+        $out += $line
+    }
+    return ($out -join "`n")
+}
+function Get-UndoVaultDir {
+    $settings = Get-UndoSettings
+    return (Join-Path $settings.autoDir 'env-vault')
+}
+function Add-UndoVault([string]$Hash, [string]$SrcPath) {
+    $dir = Get-UndoVaultDir
+    $dest = Join-Path $dir "$Hash.env"
+    if (Test-Path -LiteralPath $dest) { return }
+    New-Item -ItemType Directory -Force -Path $dir | Out-Null
+    Copy-Item -LiteralPath $SrcPath -Destination $dest -Force
+}
+function Read-UndoVault([string]$Hash) {
+    $p = Join-Path (Get-UndoVaultDir) "$Hash.env"
+    if (Test-Path -LiteralPath $p) { return $p }
+    return $null
+}
+
 # ── SAFE MODE (v0.3, module 4): disable all user plugins except undo ──────
 # State file: <autoDir>/safe-mode.json. Entering backs up cordis.patch.yml and
 # writes a minimal patch; exiting restores the backup. Works OFFLINE (when DSH
@@ -240,6 +303,7 @@ function Get-UndoSettings {
         manualDir = $script:UndoManualDir
         autoDir = $script:UndoAutoDir
         pluginDirs = @()
+        sensitiveMode = 'redact'
     }
     if (Test-Path -LiteralPath $script:UndoSettingsFile) {
         try {
@@ -250,6 +314,7 @@ function Get-UndoSettings {
             if ($j.watchDebounceMs) { $defaults.watchDebounceMs = [int]$j.watchDebounceMs }
             if ($j.keepAuto) { $defaults.keepAuto = [int]$j.keepAuto }
             if ($j.pluginDirs) { $defaults.pluginDirs = @($j.pluginDirs) }
+            if ($j.sensitiveMode) { $defaults.sensitiveMode = $j.sensitiveMode }
         } catch { }
     }
     return $defaults
@@ -298,12 +363,27 @@ function New-UndoSnapshot([string]$Kind, [string]$Reason) {
     $dir = Join-Path $base $id
     New-Item -ItemType Directory -Force -Path $dir | Out-Null
     $fileList = @()
+    $envVaultRefs = @{}
+    $redacted = @()
     foreach ($f in $script:UndoFileSpecs) {
         $src = Join-Path $f.Root $f.Name
         if (Test-Path -LiteralPath $src) {
-            $dest = Join-Path $dir (Get-UndoDestName $f)
+            $destName = Get-UndoDestName $f
+            $dest = Join-Path $dir $destName
+            # sensitive files (v0.3.2): redacted copy into the snapshot, real value into the vault
+            if ((Test-UndoSensitiveName $destName) -and (Test-UndoRedacting)) {
+                $text = [System.IO.File]::ReadAllText($src)
+                $redactedText = if ($destName -eq 'home-.credentials.yaml') { Get-UndoRedactedYaml $text } else { Get-UndoRedactedEnv $text }
+                [System.IO.File]::WriteAllText($dest, $redactedText, (New-Object System.Text.UTF8Encoding($false)))
+                $h = (Get-FileHash -LiteralPath $src -Algorithm SHA1).Hash
+                Add-UndoVault $h $src
+                $envVaultRefs[$destName] = $h
+                $redacted += $destName
+                $fileList += @{ name = $destName; size = (Get-Item -LiteralPath $dest).Length }
+                continue
+            }
             Copy-Item -LiteralPath $src -Destination $dest -Force
-            $fileList += @{ name = (Get-UndoDestName $f); size = (Get-Item -LiteralPath $dest).Length }
+            $fileList += @{ name = $destName; size = (Get-Item -LiteralPath $dest).Length }
         }
     }
     # v0.2: plugin code trees -> content-addressed blobs, manifest keeps refs
@@ -323,7 +403,7 @@ function New-UndoSnapshot([string]$Kind, [string]$Reason) {
         Add-UndoBlob $f.hash (Join-Path $script:UndoProfileRoot $f.path)
         $profileRefs += @{ path = $f.path; hash = $f.hash; size = $f.size }
     }
-    $manifest = @{ id = $id; time = (Get-Date).ToUniversalTime().ToString('o'); kind = $Kind; reason = $Reason; files = $fileList; plugins = @($pluginEntries); profileFiles = @($profileRefs) }
+    $manifest = @{ id = $id; time = (Get-Date).ToUniversalTime().ToString('o'); kind = $Kind; reason = $Reason; files = $fileList; plugins = @($pluginEntries); profileFiles = @($profileRefs); sensitiveMode = $settings.sensitiveMode; redacted = @($redacted); envVaultRefs = $envVaultRefs }
     $json = $manifest | ConvertTo-Json -Depth 8
     [System.IO.File]::WriteAllText((Join-Path $dir 'manifest.json'), $json, (New-Object System.Text.UTF8Encoding($false)))
     return $manifest
@@ -332,6 +412,16 @@ function New-UndoSnapshot([string]$Kind, [string]$Reason) {
 function Get-UndoState([object]$Snap) {
     $pairs = @()
     foreach ($file in @($Snap.files)) {
+        # sensitive files (v0.3.2): state = real-value sha1 from envVaultRefs,
+        # matching Get-UndoCurrentState which hashes the live real file
+        $vaultRef = $null
+        if ($null -ne $Snap.envVaultRefs) {
+            try { $vaultRef = $Snap.envVaultRefs.PSObject.Properties[$file.name].Value } catch { }
+        }
+        if ((Test-UndoSensitiveName $file.name) -and $vaultRef) {
+            $pairs += , @($file.name, [string]$vaultRef)
+            continue
+        }
         $p = Join-Path $Snap._Dir $file.name
         if (Test-Path -LiteralPath $p) {
             $h = (Get-FileHash -LiteralPath $p -Algorithm SHA1).Hash
@@ -403,14 +493,32 @@ function Set-UndoFlag([object]$Snap, [string]$Flag, [bool]$Value) {
 function Invoke-UndoApply([object]$Snap) {
     $restored = @()
     $missing = @()
+    $notes = @()
     foreach ($file in @($Snap.files)) {
         $spec = Get-UndoSpecByName $file.name
         if ($null -eq $spec) { continue }
         $src = Join-Path $Snap._Dir $file.name
         if (-not (Test-Path -LiteralPath $src)) { continue }
         $dst = Join-Path $spec.Root $spec.Name
+        # sensitive files (v0.3.2): vault has the real value -> full restore;
+        # vault missing (other machine / cleaned) -> redacted placeholder + note
+        $sensitiveNote = $null
+        if (Test-UndoSensitiveName $file.name) {
+            $vaultRef = $null
+            if ($null -ne $Snap.envVaultRefs) {
+                try { $vaultRef = $Snap.envVaultRefs.PSObject.Properties[$file.name].Value } catch { }
+            }
+            if ($vaultRef) {
+                $real = Read-UndoVault $vaultRef
+                if ($real) { Copy-Item -LiteralPath $real -Destination $dst -Force; $restored += $file.name; continue }
+                $sensitiveNote = "$file.name : vault missing - redacted placeholder restored, please fill in the real values"
+            } elseif ($Snap.sensitiveMode -eq 'redact') {
+                $sensitiveNote = "$file.name : restored as redacted placeholder (values were stripped from this snapshot)"
+            }
+        }
         Copy-Item -LiteralPath $src -Destination $dst -Force
         $restored += $file.name
+        if ($sensitiveNote) { $notes += $sensitiveNote }
     }
     # v0.2: plugin code trees — restore from blobs, only into dirs that are
     # still live plugins today (safety: never write to arbitrary paths).
@@ -444,7 +552,7 @@ function Invoke-UndoApply([object]$Snap) {
         Copy-Item -LiteralPath $blob -Destination $dst -Force
         $restored += "profile:$($f.path)"
     }
-    return @{ restored = @($restored); missing = @($missing) }
+    return @{ restored = @($restored); missing = @($missing); notes = @($notes) }
 }
 
 function Ensure-UndoMount {
@@ -507,6 +615,61 @@ function Invoke-UndoPrune {
     return @{ removedAuto = $removedAuto; removedPre = $removedPre }
 }
 
+# ── cross-machine preflight (v0.3.1/0.3.2): which referenced plugins resolve ─
+function Test-UndoCanResolve([string]$Name) {
+    if ([string]::IsNullOrEmpty($Name)) { return $false }
+    $anchors = @(
+        (Join-Path $env:USERPROFILE 'node_modules'),
+        (Join-Path $script:UndoProfileRoot 'node_modules'),
+        (Join-Path $script:UndoProfileRoot '..\node_modules'),
+        (Join-Path $PSScriptRoot '..\node_modules')
+    )
+    foreach ($a in $anchors) {
+        if (Test-Path -LiteralPath (Join-Path $a $Name)) { return $true }
+    }
+    return $false
+}
+
+function Get-UndoPreflight([object]$Snap) {
+    $names = @{}
+    $patchFile = @($Snap.files | Where-Object { $_.name -eq 'profile-cordis.patch.yml' } | Select-Object -First 1)
+    if ($patchFile.Count -gt 0) {
+        $patchPath = Join-Path $Snap._Dir $patchFile[0].name
+        if (Test-Path -LiteralPath $patchPath) {
+            $content = [System.IO.File]::ReadAllText($patchPath)
+            foreach ($m in [regex]::Matches($content, "name:\s*['""]?([^'""\s]+)['""]?")) {
+                $n = $m.Groups[1].Value
+                if ($n -match '^\.{1,2}[/\\]' -or $n -match '^[/\\]' -or $n -eq 'dsh-undo-savepoint') { continue }
+                $names[$n] = $true
+            }
+        }
+    }
+    $pkgFile = @($Snap.files | Where-Object { $_.name -eq 'profile-package.json' } | Select-Object -First 1)
+    if ($pkgFile.Count -gt 0) {
+        $pkgPath = Join-Path $Snap._Dir $pkgFile[0].name
+        if (Test-Path -LiteralPath $pkgPath) {
+            try {
+                $pkg = Get-Content -LiteralPath $pkgPath -Raw -Encoding UTF8 | ConvertFrom-Json
+                foreach ($n in @($pkg.dsh.profile.bundles)) {
+                    if ($n -and $n -ne 'dsh-undo-savepoint') { $names[$n] = $true }
+                }
+            } catch { }
+        }
+    }
+    $missing = @()
+    foreach ($n in $names.Keys) {
+        if (-not (Test-UndoCanResolve $n)) { $missing += $n }
+    }
+    return @{ missing = @($missing); checked = $names.Count }
+}
+
+function Test-UndoNeedsRestart([string[]]$Restored) {
+    foreach ($n in @($Restored)) {
+        if ($n -eq 'profile-cordis.patch.yml' -or $n -eq 'profile-package.json' -or $n -like 'plugin:*' -or $n -like 'profile:*') { return $true }
+    }
+    return $false
+}
+
 function Invoke-UndoRestore([string]$Mode, [string]$Id) {
     if ($Mode -eq 'undo') {
         $candidates = Get-UndoCandidates
@@ -521,7 +684,9 @@ function Invoke-UndoRestore([string]$Mode, [string]$Id) {
         $applied = Invoke-UndoApply $target.s
         if ($target -ne $candidates[0]) { Set-UndoFlag $candidates[0].s 'stepped' $true }
         $remounted = Ensure-UndoMount
-        return @{ ok = $true; restored = $applied.restored; missing = $applied.missing; targetId = $target.s.id; targetKind = $target.s.kind; targetReason = $target.s.reason; preSnapshotId = $pre.id; remounted = $remounted }
+        $preflight = Get-UndoPreflight $target.s
+        $needsRestart = Test-UndoNeedsRestart $applied.restored
+        return @{ ok = $true; restored = $applied.restored; missing = $applied.missing; notes = $applied.notes; needsRestart = $needsRestart; preflight = $preflight; targetId = $target.s.id; targetKind = $target.s.kind; targetReason = $target.s.reason; preSnapshotId = $pre.id; remounted = $remounted }
     }
     if ($Mode -eq 'redo') {
         $list = Get-UndoSnapshots
@@ -535,7 +700,9 @@ function Invoke-UndoRestore([string]$Mode, [string]$Id) {
         }
         $applied = Invoke-UndoApply $pre
         Set-UndoFlag $pre 'consumed' $true
-        return @{ ok = $true; restored = $applied.restored; missing = $applied.missing; targetId = $pre.id; remounted = $false }
+        $preflight = Get-UndoPreflight $pre
+        $needsRestart = Test-UndoNeedsRestart $applied.restored
+        return @{ ok = $true; restored = $applied.restored; missing = $applied.missing; notes = $applied.notes; needsRestart = $needsRestart; preflight = $preflight; targetId = $pre.id; remounted = $false }
     }
     # mode 'id'
     $target = Get-UndoSnapshotById $Id
@@ -543,7 +710,9 @@ function Invoke-UndoRestore([string]$Mode, [string]$Id) {
     $pre = New-UndoSnapshot 'pre-restore' "before-restore:$($target.id) ($($target.kind): $($target.reason))"
     $applied = Invoke-UndoApply $target
     $remounted = Ensure-UndoMount
-    return @{ ok = $true; restored = $applied.restored; missing = $applied.missing; targetId = $target.id; targetKind = $target.kind; targetReason = $target.reason; preSnapshotId = $pre.id; remounted = $remounted }
+    $preflight = Get-UndoPreflight $target
+    $needsRestart = Test-UndoNeedsRestart $applied.restored
+    return @{ ok = $true; restored = $applied.restored; missing = $applied.missing; notes = $applied.notes; needsRestart = $needsRestart; preflight = $preflight; targetId = $target.id; targetKind = $target.kind; targetReason = $target.reason; preSnapshotId = $pre.id; remounted = $remounted }
 }
 
 function Remove-UndoSnapshot([string]$Id) {
@@ -632,7 +801,34 @@ function Import-UndoSnapshots([string]$ZipPath) {
 
 function Get-UndoBootAlert {
     $settings = Get-UndoSettings
-    return (Test-Path -LiteralPath (Join-Path $settings.autoDir '.booting'))
+    $stateFile = Join-Path $settings.autoDir 'boot-state.json'
+    $crashed = $false
+    $lastGoodAt = $null
+    # legacy .booting marker still counts as an abnormal exit
+    if (Test-Path -LiteralPath (Join-Path $settings.autoDir '.booting')) { $crashed = $true }
+    if (Test-Path -LiteralPath $stateFile) {
+        try {
+            $st = Get-Content -LiteralPath $stateFile -Raw -Encoding UTF8 | ConvertFrom-Json
+            if (-not $st.ok) { $crashed = $true }
+            if ($st.lastGoodAt) { $lastGoodAt = $st.lastGoodAt }
+        } catch { }
+    }
+    return @{ crashed = $crashed; lastGoodAt = $lastGoodAt }
+}
+
+# Last-known-good snapshot id (v0.3): newest non-pre-restore snapshot not newer
+# than the last successful boot. Returns $null when unknown.
+function Get-UndoLastGoodId {
+    $boot = Get-UndoBootAlert
+    if (-not $boot.lastGoodAt) { return $null }
+    try { $t = [datetime]::Parse($boot.lastGoodAt).ToUniversalTime() } catch { return $null }
+    foreach ($s in (Get-UndoSnapshots)) {
+        if ($s.kind -eq 'pre-restore') { continue }
+        try {
+            if ([datetime]$s.time -le $t) { return $s.id }
+        } catch { }
+    }
+    return $null
 }
 
 function Set-UndoSettings([hashtable]$New) {
@@ -658,7 +854,19 @@ function Get-UndoDiffText([string]$Id) {
         if (-not $hasSnap -and -not $hasCur) { continue }
         if ($hasSnap -and -not $hasCur) { [void]$sb.AppendLine("$((Get-UndoDestName $f)): file did not exist at snapshot time"); continue }
         if (-not $hasSnap -and $hasCur) { [void]$sb.AppendLine("$((Get-UndoDestName $f)): NEW file (absent in snapshot)"); continue }
-        $a = @(Get-Content -LiteralPath $snapPath)
+        # sensitive files (v0.3.2): prefer the vault real value so the diff shows real differences
+        $snapContent = $snapPath
+        if (Test-UndoSensitiveName (Get-UndoDestName $f)) {
+            $vaultRef = $null
+            if ($null -ne $target.envVaultRefs) {
+                try { $vaultRef = $target.envVaultRefs.PSObject.Properties[(Get-UndoDestName $f)].Value } catch { }
+            }
+            if ($vaultRef) {
+                $real = Read-UndoVault $vaultRef
+                if ($real) { $snapContent = $real }
+            }
+        }
+        $a = @(Get-Content -LiteralPath $snapContent)
         $b = @(Get-Content -LiteralPath $curPath)
         $onlyA = @($a | Where-Object { $_ -notin $b })
         $onlyB = @($b | Where-Object { $_ -notin $a })
