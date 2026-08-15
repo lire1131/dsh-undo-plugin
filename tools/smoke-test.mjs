@@ -258,6 +258,37 @@ check(!patch6.includes('re-ensured'), 'leftover manual mount block removed in bu
 check(!patch6.includes('- id: dsh-undo-savepoint'), 'no manual mount re-added in bundle mode');
 await rm(root6, { recursive: true, force: true });
 
+console.log('== 15. rollback log: undo_recent shows what was rolled back ==');
+const root7 = await mkdtemp(join(tmpdir(), 'dsh-undo-test7-'));
+const home7 = join(root7, 'home'), profile7 = join(root7, 'profile'), snap7 = join(root7, 'snaps');
+await mkdir(home7, { recursive: true }); await mkdir(profile7, { recursive: true });
+await writeFile(join(home7, 'settings.yaml'), 'model: x\n');
+await writeFile(join(profile7, 'cordis.patch.yml'), '# patch\n[]\n');
+await writeFile(join(profile7, 'package.json'), '{"v":1}\n');
+const tools7 = new Map();
+const ctx7 = {
+  tools: { register: (t) => { tools7.set(t.name, t); return () => { }; } },
+  systemPrompt: { section: () => () => { } }, get: () => undefined,
+  effect: (fn) => { const d = fn(); return d ?? (() => { }); }, logger: { info: () => { }, warn: () => { } },
+};
+apply(ctx7, { manualDir: join(snap7, 'manual'), autoDir: join(snap7, 'auto'), homeDir: home7, profileDir: profile7, watch: false });
+await new Promise((r) => setTimeout(r, 300));
+const run7 = async (name, args) => (await tools7.get(name).execute(args, {}));
+const set7 = async (v) => writeFile(join(profile7, 'package.json'), v);
+await run7('undo_snapshot', { reason: 's1' });
+await set7('{"v":2}\n');
+await run7('undo_snapshot', { reason: 's2' });
+out = await run7('undo_restore', { mode: 'undo' });
+const targetId = out.match(/Restored snapshot (\S+)/)?.[1];
+check(!!targetId, 'undo performed');
+out = await run7('undo_recent', {});
+console.log('   ', out.split('\n').slice(0, 2).join(' | '));
+check(out.includes(targetId), 'undo_recent shows the restored snapshot id');
+check(out.includes('profile-package.json'), 'undo_recent lists the rolled-back file');
+out = await run7('undo_recent', { limit: '0' });
+check(out.includes(targetId), 'limit 0 is clamped to 1 (still shows the newest entry)');
+await rm(root7, { recursive: true, force: true });
+
 await rm(root, { recursive: true, force: true });
 console.log(`\n== RESULT: ${pass} passed, ${fail} failed ==`);
 process.exit(fail > 0 ? 1 : 0);
