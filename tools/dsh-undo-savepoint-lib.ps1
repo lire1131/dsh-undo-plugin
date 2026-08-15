@@ -228,6 +228,11 @@ function Get-UndoRedactedYaml([string]$Text) {
     }
     return ($out -join "`n")
 }
+# Pick the redaction by destination name; idempotent on already-redacted text.
+function Get-UndoRedactedForDest([string]$DestName, [string]$Text) {
+    if ($DestName -eq 'home-.credentials.yaml') { return (Get-UndoRedactedYaml $Text) }
+    return (Get-UndoRedactedEnv $Text)
+}
 function Get-UndoVaultDir {
     $settings = Get-UndoSettings
     return (Join-Path $settings.autoDir 'env-vault')
@@ -854,10 +859,16 @@ function Get-UndoDiffText([string]$Id) {
         if (-not $hasSnap -and -not $hasCur) { continue }
         if ($hasSnap -and -not $hasCur) { [void]$sb.AppendLine("$((Get-UndoDestName $f)): file did not exist at snapshot time"); continue }
         if (-not $hasSnap -and $hasCur) { [void]$sb.AppendLine("$((Get-UndoDestName $f)): NEW file (absent in snapshot)"); continue }
-        # sensitive files (v0.3.2): diff always shows the redacted snapshot
-        # content (zero leak in the UI); restore pulls real values from vault
+        # sensitive files (v0.3.2): BOTH diff sides run through redaction —
+        # the snapshot side may be an old plaintext snapshot and the current
+        # side is always the live plaintext file; neither may leak real values
         $a = @(Get-Content -LiteralPath $snapPath)
         $b = @(Get-Content -LiteralPath $curPath)
+        if (Test-UndoSensitiveName (Get-UndoDestName $f)) {
+            $destName = Get-UndoDestName $f
+            $a = @((Get-UndoRedactedForDest $destName ($a -join "`n")) -split "`n")
+            $b = @((Get-UndoRedactedForDest $destName ($b -join "`n")) -split "`n")
+        }
         $onlyA = @($a | Where-Object { $_ -notin $b })
         $onlyB = @($b | Where-Object { $_ -notin $a })
         if (@($onlyA).Count -eq 0 -and @($onlyB).Count -eq 0) { continue }

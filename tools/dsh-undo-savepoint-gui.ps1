@@ -99,6 +99,9 @@ if ($script:IsZh) {
         settingsCleanup = '自动清理(超量自动删除)'
         settingsManualDir = '手动快照目录'
         settingsAutoDir = '自动快照目录'
+        settingsSensitive = '敏感模式(redact=脱敏默认/keep=明文)'
+        settingsPluginDirs = '插件目录白名单(逗号分隔,留空=自动发现 junction)'
+        settingsBrowse = '选择文件夹'
         settingsSave = '保存设置'
         settingsCancel = '取消'
         settingsSaved = '设置已保存'
@@ -168,6 +171,9 @@ if ($script:IsZh) {
         settingsCleanup = 'Auto-cleanup (delete excess automatically)'
         settingsManualDir = 'Manual snapshot dir'
         settingsAutoDir = 'Auto snapshot dir'
+        settingsSensitive = 'Sensitive mode (redact=default/keep=plaintext)'
+        settingsPluginDirs = 'Plugin dirs whitelist (comma-separated, empty=auto-detect junctions)'
+        settingsBrowse = 'Select folder'
         settingsSave = 'Save settings'
         settingsCancel = 'Cancel'
         settingsSaved = 'Settings saved'
@@ -456,36 +462,57 @@ function Show-Settings {
     $s = Get-UndoSettings
     $dlg = New-Object System.Windows.Forms.Form
     $dlg.Text = $script:UI.settingsTitle
-    $dlg.Size = New-Object System.Drawing.Size(480, 420)
+    $dlg.Size = New-Object System.Drawing.Size(560, 560)
     $dlg.StartPosition = 'CenterParent'
     $dlg.FormBorderStyle = 'FixedDialog'
     $dlg.MaximizeBox = $false
     $dlg.MinimizeBox = $false
 
     $y = 14
-    $lblAuto = New-Object System.Windows.Forms.Label; $lblAuto.Text = $script:UI.settingsAuto; $lblAuto.SetBounds(16, $y + 4, 300, 20); $dlg.Controls.Add($lblAuto)
-    $chkAuto = New-Object System.Windows.Forms.CheckBox; $chkAuto.Checked = $s.autoEnabled; $chkAuto.SetBounds(330, $y, 20, 20); $dlg.Controls.Add($chkAuto)
+    $lblAuto = New-Object System.Windows.Forms.Label; $lblAuto.Text = $script:UI.settingsAuto; $lblAuto.SetBounds(16, $y + 4, 320, 20); $dlg.Controls.Add($lblAuto)
+    $chkAuto = New-Object System.Windows.Forms.CheckBox; $chkAuto.Checked = $s.autoEnabled; $chkAuto.SetBounds(360, $y, 20, 20); $dlg.Controls.Add($chkAuto)
     $y += 34
-    $lblDeb = New-Object System.Windows.Forms.Label; $lblDeb.Text = $script:UI.settingsDebounce; $lblDeb.SetBounds(16, $y + 4, 220, 20); $dlg.Controls.Add($lblDeb)
-    $txtDeb = New-Object System.Windows.Forms.TextBox; $txtDeb.Text = [string]$s.watchDebounceMs; $txtDeb.SetBounds(250, $y, 90, 24); $dlg.Controls.Add($txtDeb)
+    $lblDeb = New-Object System.Windows.Forms.Label; $lblDeb.Text = $script:UI.settingsDebounce; $lblDeb.SetBounds(16, $y + 4, 240, 20); $dlg.Controls.Add($lblDeb)
+    $txtDeb = New-Object System.Windows.Forms.TextBox; $txtDeb.Text = [string]$s.watchDebounceMs; $txtDeb.SetBounds(270, $y, 90, 24); $dlg.Controls.Add($txtDeb)
     $y += 34
-    $lblKeep = New-Object System.Windows.Forms.Label; $lblKeep.Text = $script:UI.settingsKeep; $lblKeep.SetBounds(16, $y + 4, 220, 20); $dlg.Controls.Add($lblKeep)
-    $txtKeep = New-Object System.Windows.Forms.TextBox; $txtKeep.Text = [string]$s.keepAuto; $txtKeep.SetBounds(250, $y, 90, 24); $dlg.Controls.Add($txtKeep)
+    $lblKeep = New-Object System.Windows.Forms.Label; $lblKeep.Text = $script:UI.settingsKeep; $lblKeep.SetBounds(16, $y + 4, 240, 20); $dlg.Controls.Add($lblKeep)
+    $txtKeep = New-Object System.Windows.Forms.TextBox; $txtKeep.Text = [string]$s.keepAuto; $txtKeep.SetBounds(270, $y, 90, 24); $dlg.Controls.Add($txtKeep)
     $y += 34
-    $lblPre = New-Object System.Windows.Forms.Label; $lblPre.Text = $script:UI.settingsKeepPre; $lblPre.SetBounds(16, $y + 4, 220, 20); $dlg.Controls.Add($lblPre)
-    $txtPre = New-Object System.Windows.Forms.TextBox; $txtPre.Text = [string]$s.keepPre; $txtPre.SetBounds(250, $y, 90, 24); $dlg.Controls.Add($txtPre)
+    $lblPre = New-Object System.Windows.Forms.Label; $lblPre.Text = $script:UI.settingsKeepPre; $lblPre.SetBounds(16, $y + 4, 240, 20); $dlg.Controls.Add($lblPre)
+    $txtPre = New-Object System.Windows.Forms.TextBox; $txtPre.Text = [string]$s.keepPre; $txtPre.SetBounds(270, $y, 90, 24); $dlg.Controls.Add($txtPre)
     $y += 34
-    $lblClean = New-Object System.Windows.Forms.Label; $lblClean.Text = $script:UI.settingsCleanup; $lblClean.SetBounds(16, $y + 4, 300, 20); $dlg.Controls.Add($lblClean)
-    $chkClean = New-Object System.Windows.Forms.CheckBox; $chkClean.Checked = $s.autoCleanup; $chkClean.SetBounds(330, $y, 20, 20); $dlg.Controls.Add($chkClean)
+    $lblClean = New-Object System.Windows.Forms.Label; $lblClean.Text = $script:UI.settingsCleanup; $lblClean.SetBounds(16, $y + 4, 320, 20); $dlg.Controls.Add($lblClean)
+    $chkClean = New-Object System.Windows.Forms.CheckBox; $chkClean.Checked = $s.autoCleanup; $chkClean.SetBounds(360, $y, 20, 20); $dlg.Controls.Add($chkClean)
+    $y += 34
+    # sensitiveMode (v0.3.2): redact (default) | keep
+    $lblSens = New-Object System.Windows.Forms.Label; $lblSens.Text = $script:UI.settingsSensitive; $lblSens.SetBounds(16, $y + 4, 320, 20); $dlg.Controls.Add($lblSens)
+    $cmbSens = New-Object System.Windows.Forms.ComboBox
+    $cmbSens.DropDownStyle = 'DropDownList'
+    $cmbSens.Items.AddRange([object[]]@('redact', 'keep'))
+    $cmbSens.SelectedItem = if ($s.sensitiveMode -eq 'keep') { 'keep' } else { 'redact' }
+    $cmbSens.SetBounds(360, $y, 100, 24); $dlg.Controls.Add($cmbSens)
     $y += 34
     $lblMDir = New-Object System.Windows.Forms.Label; $lblMDir.Text = $script:UI.settingsManualDir; $lblMDir.SetBounds(16, $y + 4, 150, 20); $dlg.Controls.Add($lblMDir)
-    $txtMDir = New-Object System.Windows.Forms.TextBox; $txtMDir.Text = [string]$s.manualDir; $txtMDir.SetBounds(170, $y, 270, 24); $dlg.Controls.Add($txtMDir)
+    $txtMDir = New-Object System.Windows.Forms.TextBox; $txtMDir.Text = [string]$s.manualDir; $txtMDir.SetBounds(170, $y, 300, 24); $dlg.Controls.Add($txtMDir)
+    $btnMDir = New-Object System.Windows.Forms.Button; $btnMDir.Text = '📁'; $btnMDir.SetBounds(478, $y, 30, 24)
+    $btnMDir.Add_Click({ $fbd = New-Object System.Windows.Forms.FolderBrowserDialog; $fbd.Description = $script:UI.settingsBrowse; if ($fbd.ShowDialog() -eq 'OK') { $txtMDir.Text = $fbd.SelectedPath } })
+    $dlg.Controls.Add($btnMDir)
     $y += 34
     $lblADir = New-Object System.Windows.Forms.Label; $lblADir.Text = $script:UI.settingsAutoDir; $lblADir.SetBounds(16, $y + 4, 150, 20); $dlg.Controls.Add($lblADir)
-    $txtADir = New-Object System.Windows.Forms.TextBox; $txtADir.Text = [string]$s.autoDir; $txtADir.SetBounds(170, $y, 270, 24); $dlg.Controls.Add($txtADir)
+    $txtADir = New-Object System.Windows.Forms.TextBox; $txtADir.Text = [string]$s.autoDir; $txtADir.SetBounds(170, $y, 300, 24); $dlg.Controls.Add($txtADir)
+    $btnADir = New-Object System.Windows.Forms.Button; $btnADir.Text = '📁'; $btnADir.SetBounds(478, $y, 30, 24)
+    $btnADir.Add_Click({ $fbd = New-Object System.Windows.Forms.FolderBrowserDialog; $fbd.Description = $script:UI.settingsBrowse; if ($fbd.ShowDialog() -eq 'OK') { $txtADir.Text = $fbd.SelectedPath } })
+    $dlg.Controls.Add($btnADir)
+    $y += 34
+    # pluginDirs (v0.3.2): comma-separated, empty = auto-discovery
+    $lblPDirs = New-Object System.Windows.Forms.Label; $lblPDirs.Text = $script:UI.settingsPluginDirs; $lblPDirs.SetBounds(16, $y + 4, 500, 20); $dlg.Controls.Add($lblPDirs)
+    $y += 22
+    $txtPDirs = New-Object System.Windows.Forms.TextBox
+    $txtPDirs.Text = [string](@($s.pluginDirs) -join ', ')
+    $txtPDirs.SetBounds(16, $y, 492, 24); $dlg.Controls.Add($txtPDirs)
     $y += 44
-    $btnOk = New-Object System.Windows.Forms.Button; $btnOk.Text = $script:UI.settingsSave; $btnOk.SetBounds(160, $y, 110, 30); $dlg.Controls.Add($btnOk)
-    $btnCancel = New-Object System.Windows.Forms.Button; $btnCancel.Text = $script:UI.settingsCancel; $btnCancel.SetBounds(280, $y, 90, 30); $dlg.Controls.Add($btnCancel)
+    $btnOk = New-Object System.Windows.Forms.Button; $btnOk.Text = $script:UI.settingsSave; $btnOk.SetBounds(180, $y, 110, 30); $dlg.Controls.Add($btnOk)
+    $btnCancel = New-Object System.Windows.Forms.Button; $btnCancel.Text = $script:UI.settingsCancel; $btnCancel.SetBounds(300, $y, 90, 30); $dlg.Controls.Add($btnCancel)
     $btnOk.Add_Click({
         try {
             $new = @{
@@ -496,6 +523,8 @@ function Show-Settings {
                 keepPre = [int]$txtPre.Text
                 manualDir = $txtMDir.Text.Trim()
                 autoDir = $txtADir.Text.Trim()
+                sensitiveMode = [string]$cmbSens.SelectedItem
+                pluginDirs = @($txtPDirs.Text -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
             }
             Set-UndoSettings $new
             [System.Windows.Forms.MessageBox]::Show($script:UI.settingsSaved, $script:UI.settingsTitle, 'OK', 'Information')
