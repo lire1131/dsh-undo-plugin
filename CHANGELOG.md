@@ -2,7 +2,7 @@
 
 dsh-undo-savepoint 的重要变更。日期为本地时间(UTC+8)。English version: [CHANGELOG.en.md](CHANGELOG.en.md)
 
-## [0.4.0] - 2026-08-15
+## [0.3.1] - 2026-08-15
 
 ### 新增
 - **跨机一致性预检**:恢复(undo/redo/restore)时自动扫描目标快照引用的插件(patch 挂载条目 + package.json bundles),本机解析不到的**明确列出并提示**"恢复后可能启动失败",建议先装插件或安全模式启动

@@ -2,7 +2,7 @@
 
 Notable changes to dsh-undo-savepoint. Dates are in local time (UTC+8). 中文版:[CHANGELOG.md](CHANGELOG.md)
 
-## [0.4.0] - 2026-08-15
+## [0.3.1] - 2026-08-15
 
 ### Added
 - **Cross-machine preflight**: undo/redo/restore now scan the target snapshot's plugin references (patch mount entries + `package.json` bundles) and clearly report any that this machine cannot resolve, warning "DSH may fail to start after restore" and suggesting installing them first or booting via safe mode
