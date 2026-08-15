@@ -2,6 +2,17 @@
 
 Notable changes to dsh-undo-savepoint. Dates are in local time (UTC+8). 中文版:[CHANGELOG.md](CHANGELOG.md)
 
+## [0.4.0] - 2026-08-15
+
+### Added
+- **Cross-machine preflight**: undo/redo/restore now scan the target snapshot's plugin references (patch mount entries + `package.json` bundles) and clearly report any that this machine cannot resolve, warning "DSH may fail to start after restore" and suggesting installing them first or booting via safe mode
+  - Multi-anchor probing (user `node_modules` / profile dependency tree / plugin location chain) — resolvable from any anchor counts as installed, avoiding false positives under junction installs
+  - Local file entries (`name: './xxx'`) are not probed; preflight results are written to the rollback log
+- **docs/migration bilingual guide**: cross-machine restore behavior (plugin code is never dumped into the target machine, blob leftovers, the missing-plugin pitfall) + best practices, in Chinese and English
+
+### Fixed
+- `toolsRequire` hoisted from block scope to module scope (its ReferenceError used to be silently swallowed by a try/catch; multi-anchor probing depends on it)
+
 ## [0.3.0] - 2026-08-15
 
 ### Added (safety net: crash attribution + safe mode + restart notice, phase 2)

@@ -2,6 +2,17 @@
 
 dsh-undo-savepoint 的重要变更。日期为本地时间(UTC+8)。English version: [CHANGELOG.en.md](CHANGELOG.en.md)
 
+## [0.4.0] - 2026-08-15
+
+### 新增
+- **跨机一致性预检**:恢复(undo/redo/restore)时自动扫描目标快照引用的插件(patch 挂载条目 + package.json bundles),本机解析不到的**明确列出并提示**"恢复后可能启动失败",建议先装插件或安全模式启动
+  - 多锚点探测(用户 node_modules / profile 依赖树 / 插件位置链),任一可解析即视为已装,避免 junction 布局误报
+  - 本地文件条目(`name: './xxx'`)不探测;预检结果写入回滚日志
+- **docs/migration 双语文档**:跨机迁移行为说明(插件代码不会塞入目标机、blob 残留、patch 缺插件的坑)+ 最佳实践,中英双语
+
+### 修复
+- `toolsRequire` 从块级作用域提升为模块级(此前外部函数引用会被 try/catch 静默吞掉 ReferenceError,预检的多锚点解析依赖它)
+
 ## [0.3.0] - 2026-08-15
 
 ### 新增（兜底三件套：崩溃归因 + 安全模式 + 重启联动，第 2 期）

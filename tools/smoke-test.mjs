@@ -423,6 +423,39 @@ out10 = await run10('undo_safe_mode', { action: 'status' });
 check(out10.includes('OFF'), 'status reports OFF after exit');
 await rm(root10, { recursive: true, force: true });
 
+console.log('== 19. cross-machine preflight: missing plugins reported (v0.4) ==');
+const root11 = await mkdtemp(join(tmpdir(), 'dsh-undo-test11-'));
+const home11 = join(root11, 'home'), profile11 = join(root11, 'profile'), snap11 = join(root11, 'snaps');
+await mkdir(home11, { recursive: true }); await mkdir(profile11, { recursive: true });
+await writeFile(join(home11, 'settings.yaml'), 'model: x\n');
+// patch 引用：一个本机解析不到的插件 + 一个本地文件（不应被探测）
+await writeFile(join(profile11, 'cordis.patch.yml'), '# patch\n- insert:\n    - id: ghost\n      name: dsh-ghost-plugin-xyz\n    - id: rg\n      name: \'./router-global.mjs\'\n');
+await writeFile(join(profile11, 'router-global.mjs'), 'export const a = 1;\n');
+// bundles 引用：一个真实存在的包（不应误报）+ 一个不存在的
+await writeFile(join(profile11, 'package.json'), JSON.stringify({ name: 'test', dsh: { profile: { bundles: ['@deepseek-ai/dsh-base', 'dsh-ghost-bundle-xyz'] } } }));
+const tools11 = new Map();
+const ctx11 = {
+  tools: { register: (t) => { tools11.set(t.name, t); return () => { }; } },
+  systemPrompt: { section: () => () => { } }, get: () => undefined,
+  effect: (fn) => { const d = fn(); return d ?? (() => { }); }, logger: { info: () => { }, warn: () => { } },
+};
+apply(ctx11, { manualDir: join(snap11, 'manual'), autoDir: join(snap11, 'auto'), homeDir: home11, profileDir: profile11, watch: false, pluginDirs: [] });
+await new Promise((r) => setTimeout(r, 300));
+const run11 = async (name, args) => (await tools11.get(name).execute(args, {}));
+const set11 = async (v) => writeFile(join(profile11, 'package.json'), v);
+await run11('undo_snapshot', { reason: 's1' });
+await set11(JSON.stringify({ name: 'test', v: 2, dsh: { profile: { bundles: ['@deepseek-ai/dsh-base', 'dsh-ghost-bundle-xyz'] } } }));
+await run11('undo_snapshot', { reason: 's2' });
+out = await run11('undo_restore', { mode: 'undo' }); // 回到 s1 快照 → 预检 s1 的引用
+const preflightLine = out.split('\n').find((l) => l.includes('preflight')) ?? '';
+console.log('   ', preflightLine);
+check(out.includes('Cross-machine preflight'), 'preflight section reported');
+check(out.includes('dsh-ghost-plugin-xyz'), 'missing patch plugin named');
+check(out.includes('dsh-ghost-bundle-xyz'), 'missing bundle plugin named');
+check(!preflightLine.includes('router-global.mjs'), 'local file entry not probed');
+check(!preflightLine.includes('@deepseek-ai/dsh-base'), 'resolvable bundle not flagged');
+await rm(root11, { recursive: true, force: true });
+
 await rm(root, { recursive: true, force: true });
 console.log(`\n== RESULT: ${pass} passed, ${fail} failed ==`);
 process.exit(fail > 0 ? 1 : 0);
