@@ -7,6 +7,24 @@ Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 . (Join-Path $PSScriptRoot 'dsh-undo-savepoint-lib.ps1')
 
+# ── single-instance guard (v0.3.2) ─────────────────────────────────────────
+# A second launch (double-click the shortcut again) shows a notice and exits,
+# so minimizing to the tray can never accumulate duplicate GUI processes.
+# The mutex is released automatically when the process exits (kernel object).
+$script:guiMutex = $null
+try {
+    $script:guiMutex = New-Object System.Threading.Mutex($false, 'DSHUndoSavepointGUI')
+    if (-not $script:guiMutex.WaitOne(0, $false)) {
+        $msg = if ($env:DSH_UNDO_LANG -eq 'zh' -or [System.Globalization.CultureInfo]::CurrentUICulture.Name -like 'zh*') {
+            'DSH 撤销管理器已在运行(可能最小化到了托盘)。'
+        } else {
+            'DSH Undo Manager is already running (it may be minimized to the tray).'
+        }
+        [System.Windows.Forms.MessageBox]::Show($msg, 'DSH Undo', 'OK', 'Information')
+        exit 0
+    }
+} catch { /* mutex unavailable in restricted environments: allow running anyway */ }
+
 # Hide the console window right after startup (safe no-op when none exists).
 try {
     Add-Type -Namespace UndoWin -Name Native -MemberDefinition @'
@@ -209,11 +227,13 @@ $bannerRollback.Add_Click({ Boot-Rollback })
 $banner.Controls.Add($bannerLabel)
 $banner.Controls.Add($bannerRollback)
 
-# toolbar
+# toolbar: 84px tall so the 11 buttons wrap onto TWO rows (FlowLayoutPanel
+# wraps by default) — no scrollbar, every button always visible; the
+# snapshot list simply gets a bit less height (v0.3.2)
 $toolbar = New-Object System.Windows.Forms.FlowLayoutPanel
 $toolbar.Dock = 'Top'
-$toolbar.Padding = New-Object System.Windows.Forms.Padding(10, 8, 10, 8)
-$toolbar.Height = 48
+$toolbar.Padding = New-Object System.Windows.Forms.Padding(10, 6, 10, 6)
+$toolbar.Height = 84
 
 function New-ToolButton([string]$Text, [int]$Width, [scriptblock]$OnClick) {
     $btn = New-Object System.Windows.Forms.Button
@@ -235,7 +255,6 @@ $btnExport = New-ToolButton $script:UI.btnExport 90 { Export-Now }
 $btnImport = New-ToolButton $script:UI.btnImport 90 { Import-Now }
 $btnSettings = New-ToolButton $script:UI.btnSettings 90 { Show-Settings }
 $btnSafeMode = New-ToolButton $script:UI.btnSafeMode 95 { Toggle-SafeMode }
-$toolbar.AutoScroll = $true # v0.3.2: window smaller than the toolbar -> scroll instead of hiding buttons
 
 $toolbar.Controls.Add($btnSave)
 $toolbar.Controls.Add($btnUndo)
