@@ -88,6 +88,42 @@ mklink /J "<your-dsh-install>\node_modules\dsh-undo-savepoint" "D:\dsh\plugins\d
 
 > Dependency note: the host plugin loads `@deepseek-ai/dsh-tools` via `createRequire('<dsh-install-root>/package.json')`. If DSH lives elsewhere, set the environment variable `DSH_ROOT=<dsh-install-root>` — no extra package installation needed.
 
+## Where are the external tools? ("I installed it and cannot find it")
+
+The external undo tools (GUI window + CLI) are **not placed on the desktop** — they ship inside the plugin install directory:
+
+| Install method | Tool location |
+|---|---|
+| Method A: `dsh plugin add` | `C:\Users\<your-username>\.dsh\profiles\web\node_modules\dsh-undo-savepoint\tools\` |
+| Method B: clone + junction | your clone `...\dsh-undo-savepoint\tools\` |
+
+> ⚠️ The install command references the repo name `dsh-undo-plugin`, but the installed folder is named after the **package name `dsh-undo-savepoint`** — searching by "repo name" will not find it.
+
+**One-click desktop shortcut (recommended — open the tools straight from the desktop afterwards):**
+
+Double-click `tools\make-desktop-shortcut.bat` (it auto-locates the plugin directory) and a **DSH Undo Manager** icon appears on the desktop;
+or copy the whole block below into a PowerShell window and press Enter (no need to locate any file first):
+
+```powershell
+$d = @("$env:USERPROFILE\.dsh\profiles\web\node_modules\dsh-undo-savepoint", "$env:USERPROFILE\.dsh\profiles\node_modules\dsh-undo-savepoint", "$env:USERPROFILE\node_modules\dsh-undo-savepoint") | Where-Object { Test-Path (Join-Path $_ 'tools\dsh-undo-savepoint-gui.bat') } | Select-Object -First 1
+if ($d) {
+  $w = New-Object -ComObject WScript.Shell
+  $s = $w.CreateShortcut((Join-Path ([Environment]::GetFolderPath('Desktop')) 'DSH Undo Manager.lnk'))
+  $s.TargetPath = Join-Path $d 'tools\dsh-undo-savepoint-gui.bat'
+  $s.WorkingDirectory = Join-Path $d 'tools'
+  $s.Save()
+  Write-Host "Desktop shortcut created: $($s.FullName)"
+} else { Write-Host 'Plugin directory not found — install it first: dsh plugin --profile web add github:lire1131/dsh-undo-plugin#master' }
+```
+
+**Just want to open the tools folder:**
+
+```powershell
+explorer "$env:USERPROFILE\.dsh\profiles\web\node_modules\dsh-undo-savepoint\tools"
+```
+
+After that, double-click the desktop **DSH Undo Manager** icon to open the external tools (they work even when DSH itself fails to boot).
+
 ## Usage
 
 - **Undo**: header **Undo** button / `Ctrl+Alt+Z` / tell the AI "undo the last step".

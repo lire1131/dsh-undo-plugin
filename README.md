@@ -90,6 +90,42 @@ mklink /J "<你的DSH安装>\node_modules\dsh-undo-savepoint" "D:\dsh\plugins\ds
 
 > 依赖说明:host 插件通过 `createRequire('<DSH安装根>/package.json')` 加载 `@deepseek-ai/dsh-tools`。若 DSH 安装在其他位置,设置环境变量 `DSH_ROOT=<DSH安装根>` 即可,无需额外安装依赖。
 
+## 局外工具在哪(装完找不到?)
+
+局外撤销工具(GUI 窗口 + 命令行)**不装到桌面,而是随插件装在安装目录里**:
+
+| 安装方式 | 工具位置 |
+|---|---|
+| 方式 A:`dsh plugin add` | `C:\Users\<你的用户名>\.dsh\profiles\web\node_modules\dsh-undo-savepoint\tools\` |
+| 方式 B:clone + junction | 你 clone 的目录 `...\dsh-undo-savepoint\tools\` |
+
+> ⚠️ 注意:安装命令里的仓库名是 `dsh-undo-plugin`,但装好后目录名是**包名 `dsh-undo-savepoint`**——按"仓库名"去找目录是找不到的。
+
+**一键创建桌面快捷方式(推荐,以后从桌面直接打开):**
+
+双击 `tools\make-desktop-shortcut.bat`(它会自动定位插件目录),桌面出现「DSH撤销管理器」图标;
+或者把下面整段复制到 PowerShell 窗口回车(无需先找文件,自动定位):
+
+```powershell
+$d = @("$env:USERPROFILE\.dsh\profiles\web\node_modules\dsh-undo-savepoint", "$env:USERPROFILE\.dsh\profiles\node_modules\dsh-undo-savepoint", "$env:USERPROFILE\node_modules\dsh-undo-savepoint") | Where-Object { Test-Path (Join-Path $_ 'tools\dsh-undo-savepoint-gui.bat') } | Select-Object -First 1
+if ($d) {
+  $w = New-Object -ComObject WScript.Shell
+  $s = $w.CreateShortcut((Join-Path ([Environment]::GetFolderPath('Desktop')) 'DSH撤销管理器.lnk'))
+  $s.TargetPath = Join-Path $d 'tools\dsh-undo-savepoint-gui.bat'
+  $s.WorkingDirectory = Join-Path $d 'tools'
+  $s.Save()
+  Write-Host "已创建桌面快捷方式:$($s.FullName)"
+} else { Write-Host '未找到插件目录,请先安装:dsh plugin --profile web add github:lire1131/dsh-undo-plugin#master' }
+```
+
+**只想打开工具目录看一眼:**
+
+```powershell
+explorer "$env:USERPROFILE\.dsh\profiles\web\node_modules\dsh-undo-savepoint\tools"
+```
+
+之后双击桌面「DSH撤销管理器」即可打开局外工具(DSH 崩溃、启动不了时也能用)。
+
 ## 使用
 
 - **撤销**:头部「撤销」按钮 / `Ctrl+Alt+Z` / 对 AI 说"撤销上一步"。

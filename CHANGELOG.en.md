@@ -2,6 +2,15 @@
 
 Notable changes to dsh-undo-savepoint. Dates are in local time (UTC+8). 中文版:[CHANGELOG.md](CHANGELOG.md)
 
+## [0.2.1] - 2026-08-15
+
+### Added
+- **One-click desktop shortcut**: `tools/make-desktop-shortcut.bat` (double-click) / `.ps1` (CLI) auto-locates the plugin directory and creates a **DSH Undo Manager** shortcut on the desktop — fixes "I installed it and cannot find the external tools"
+- **README "Where are the external tools?" section**: exact tool paths for both install methods + a self-contained one-liner (auto-locates and creates the shortcut, no need to find any file first) + a command to open the tools folder
+
+### Fixed
+- Documented the repo/package name mismatch: the install command says `dsh-undo-plugin`, but the installed folder is named after the **package name `dsh-undo-savepoint`** — searching by repo name can never find it
+
 ## [0.2.0] - 2026-08-15
 
 ### Added (plugin-code-level rollback, phase 1)
