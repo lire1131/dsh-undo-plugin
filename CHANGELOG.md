@@ -2,6 +2,23 @@
 
 dsh-undo-savepoint 的重要变更。日期为本地时间(UTC+8)。English version: [CHANGELOG.en.md](CHANGELOG.en.md)
 
+## [0.2.0] - 2026-08-15
+
+### 新增（插件代码级撤销，第 1 期）
+- **插件代码树快照**:自动发现用户插件(`node_modules` 下的 junction,如 `D:\dsh\plugins\*`)与 profile 本地代码文件(`cordis.patch.yml` 里 `name: './xxx'` 引用的 `router-global.mjs` 等),插件代码被改坏也能撤销——配置没变也能撤(如 whale-kit "yield* is not async iterable" 这类纯代码事故)
+- **体积 4 道保险**:扩展名白名单(只收 `.js/.mjs/.cjs/.ts/.json/.yml` 等代码文件,资源如 gif/png 不进快照,实测 pet 57MB→47KB)、内容寻址 blob 库去重(`<快照根>/blobs`,没变的文件零拷贝)、单文件/单快照上限(超限记录 skipped)、按引用恢复(缺失明确报告)
+- **插件文件 diff**:`undo_diff` 与 WebUI 差异预览显示 `plugin:xxx` / `profile:xxx` 条目
+- **插件 watcher**:插件代码目录变化自动快照(`plugin-code-change`),恢复动作自身不误伤(echo 检测)
+- **单一清单 `lib/spec.json`**:快照范围 Node 与 PowerShell 共用一份配置,不再双写漂移
+- **`pluginDirs` 设置**:可显式指定插件目录白名单(空数组 = 关闭自动发现,测试/隔离用)
+- **导出/导入含 blob 库**:ZIP 备份迁移后 restore 不缺内容
+- 快照 manifest 记录插件名/版本/跳过项;`undo_list` 显示插件文件数;恢复报告列出未恢复项(missing)
+
+### 修复
+- 旧快照(无 plugins 字段)在 PowerShell 离线工具下被 `@($null)` 单元素数组污染状态与 diff(过滤空值)
+- 离线 CLI diff 分支改用统一实现(Get-UndoDiffText),支持插件文件
+- ps1 文件统一 UTF-8 BOM,PowerShell 5.1 正确解析中文注释
+
 ## [0.1.1] - 2026-08-15
 
 ### 新增

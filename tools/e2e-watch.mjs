@@ -16,10 +16,13 @@ const root = await mkdtemp(join(tmpdir(), 'dsh-undo-e2e-'));
 const home = join(root, 'home');
 const profile = join(root, 'profile');
 const snapDir = join(root, 'snapshots');
+const pluginDir = join(root, 'plugin-x'); // 模拟插件代码目录（v0.2）
 await mkdir(home, { recursive: true });
 await mkdir(profile, { recursive: true });
+await mkdir(join(pluginDir, 'lib'), { recursive: true });
 await writeFile(join(home, 'settings.yaml'), 'model: x\n');
 await writeFile(join(profile, 'cordis.patch.yml'), '# patch\n[]\n');
+await writeFile(join(pluginDir, 'lib', 'index.js'), 'export const a = 1;\n');
 
 const tools = new Map();
 const ctx = {
@@ -29,7 +32,7 @@ const ctx = {
   effect: (fn) => { const d = fn(); return d ?? (() => { }); },
   logger: { info: () => { }, warn: (...a) => console.warn('[warn]', ...a) },
 };
-apply(ctx, { manualDir: join(snapDir, 'manual'), autoDir: join(snapDir, 'auto'), homeDir: home, profileDir: profile, watch: true, watchDebounceMs: 300, keepAuto: 10 });
+apply(ctx, { manualDir: join(snapDir, 'manual'), autoDir: join(snapDir, 'auto'), homeDir: home, profileDir: profile, watch: true, watchDebounceMs: 300, keepAuto: 10, pluginDirs: [pluginDir] });
 await sleep(600); // baseline lands
 
 let pass = 0, fail = 0;
@@ -69,6 +72,21 @@ await writeFile(join(home, 'settings.yaml'), 'model: w\n');
 await sleep(1200); // ANOTHER real change after the undo
 const blocked = await run('undo_restore', { mode: 'redo' });
 check(blocked.includes('blocked'), 'redo blocked when a real new change exists');
+
+console.log('== 5. plugin code change auto-snapshots; undo restores without echo snapshot (v0.2) ==');
+await writeFile(join(pluginDir, 'lib', 'index.js'), 'export const a = 2;\n');
+await sleep(1500); // plugin watcher + debounce
+let out5 = await run('undo_list', {});
+const cBefore = (out5.match(/plugin-code-change/g) || []).length;
+check(cBefore >= 1, `plugin code change auto-snapshotted as plugin-code-change (${cBefore})`);
+check(out5.includes('plugin file(s)'), 'list shows plugin file count');
+out5 = await run('undo_restore', { mode: 'undo' });
+console.log('   ', out5.split('\n')[0]);
+check((await readFile(join(pluginDir, 'lib', 'index.js'), 'utf8')).includes('a = 1'), 'plugin code file restored by undo');
+await sleep(1500); // if the restore echo was not suppressed, an extra auto snapshot appears
+out5 = await run('undo_list', {});
+const cAfter = (out5.match(/plugin-code-change/g) || []).length;
+check(cAfter === cBefore, `no auto snapshot from the plugin restore itself (${cBefore} -> ${cAfter})`);
 
 await rm(root, { recursive: true, force: true });
 console.log(`\n== RESULT: ${pass} passed, ${fail} failed ==`);

@@ -1,4 +1,4 @@
-# dsh-undo-savepoint-lib.ps1 - shared logic for the dsh-undo-savepoint external tooling.
+﻿# dsh-undo-savepoint-lib.ps1 - shared logic for the dsh-undo-savepoint external tooling.
 # Dot-source this from dsh-undo-savepoint.ps1 (CLI) and dsh-undo-savepoint-gui.ps1 (window).
 # Works WITHOUT DSH running: reads/writes the same snapshot stores and the
 # same manifest format as the dsh-undo-savepoint DSH plugin.
@@ -17,6 +17,8 @@ $script:UndoHomeRoot = Join-Path $env:USERPROFILE '.dsh'
 $script:UndoProfileRoot = Join-Path $script:UndoHomeRoot 'profiles\web'
 
 # Must mirror FILE_SPECS in the dsh-undo-savepoint plugin (lib/index.js).
+# v0.2: the real source of truth is lib/spec.json (module 7) — this built-in
+# list is only a fallback when spec.json is missing/unreadable.
 $script:UndoFileSpecs = @(
     @{ RootKey = 'profile'; Root = $script:UndoProfileRoot; Name = 'cordis.patch.yml' },
     @{ RootKey = 'profile'; Root = $script:UndoProfileRoot; Name = 'package.json' },
@@ -26,8 +28,158 @@ $script:UndoFileSpecs = @(
     @{ RootKey = 'home';    Root = $script:UndoHomeRoot;    Name = '.env' }
 )
 
+# ── plugin code tree rules (v0.2, module 1) ────────────────────────────────
+# Defaults mirror lib/spec.json; Initialize-UndoSpec overrides them when the
+# file is readable. Only "code/config" files enter snapshots — assets (gif/png
+# etc.) are excluded so snapshots stay tiny (dsh-pet 57MB -> ~47KB of code).
+$script:UndoCodeExts = @('.js', '.mjs', '.cjs', '.ts', '.mts', '.cts', '.json', '.yml', '.yaml')
+$script:UndoExcludeDirs = @('node_modules', '.git', 'dist', 'build', 'cache', '.cache', 'coverage', '.turbo')
+$script:UndoExcludeNames = @('package-lock.json', 'pnpm-lock.yaml', 'yarn.lock', '.DS_Store')
+$script:UndoMaxFileBytes = 262144
+$script:UndoMaxSnapBytes = 10485760
+
+# Read lib/spec.json (single source of truth shared with the Node plugin).
+function Initialize-UndoSpec {
+    $specPath = Join-Path $PSScriptRoot '..\lib\spec.json'
+    if (-not (Test-Path -LiteralPath $specPath)) { return }
+    try {
+        $spec = Get-Content -LiteralPath $specPath -Raw -Encoding UTF8 | ConvertFrom-Json
+        if ($spec.configFiles) {
+            $list = @()
+            foreach ($f in $spec.configFiles) {
+                $root = if ($f.root -eq 'profile') { $script:UndoProfileRoot }
+                        elseif ($f.root -eq 'home') { $script:UndoHomeRoot } else { $null }
+                if ($root) { $list += @{ RootKey = $f.root; Root = $root; Name = $f.rel } }
+            }
+            if ($list.Count -gt 0) { $script:UndoFileSpecs = $list }
+        }
+        if ($spec.pluginCodeExts) { $script:UndoCodeExts = @($spec.pluginCodeExts | ForEach-Object { $_.ToLower() }) }
+        if ($spec.pluginExcludeDirNames) { $script:UndoExcludeDirs = @($spec.pluginExcludeDirNames) }
+        if ($spec.pluginExcludeFileNames) { $script:UndoExcludeNames = @($spec.pluginExcludeFileNames) }
+        if ($spec.pluginMaxFileBytes) { $script:UndoMaxFileBytes = [int]$spec.pluginMaxFileBytes }
+        if ($spec.pluginMaxSnapshotBytes) { $script:UndoMaxSnapBytes = [int]$spec.pluginMaxSnapshotBytes }
+    } catch { }
+}
+Initialize-UndoSpec
+
 function Get-UndoDestName([hashtable]$Spec) {
     return "$($Spec.RootKey)-$($Spec.Name -replace '[\\/]', '-')"
+}
+
+# ── plugin discovery & collection (v0.2, module 1) ─────────────────────────
+# Find user plugins: explicit pluginDirs (settings / DSH_PLUGIN_DIRS) first,
+# otherwise auto-detect junctions under the user node_modules (the standard
+# `mklink /J` install layout). Returns @( @{name;dir;version} ).
+function Get-UndoPlugins {
+    $settings = Get-UndoSettings
+    $out = @()
+    $seen = @{}
+    $explicit = @()
+    if ($settings.pluginDirs) { $explicit += @($settings.pluginDirs) }
+    if ($env:DSH_PLUGIN_DIRS) { $explicit += @(($env:DSH_PLUGIN_DIRS -split '[;,]') | ForEach-Object { $_.Trim() } | Where-Object { $_ }) }
+    if ($explicit.Count -gt 0) {
+        foreach ($d in $explicit) {
+            if (-not (Test-Path -LiteralPath $d)) { continue }
+            $real = (Get-Item -LiteralPath $d).FullName
+            if ($seen.ContainsKey($real)) { continue }
+            $seen[$real] = $true
+            $ver = ''
+            $pkg = Join-Path $real 'package.json'
+            if (Test-Path -LiteralPath $pkg) { try { $ver = [string]((Get-Content -LiteralPath $pkg -Raw -Encoding UTF8 | ConvertFrom-Json).version) } catch { } }
+            $out += @{ name = (Split-Path $real -Leaf); dir = $real; version = $ver }
+        }
+        return @($out)
+    }
+    $roots = @((Join-Path $env:USERPROFILE 'node_modules'))
+    foreach ($root in $roots) {
+        if (-not (Test-Path -LiteralPath $root)) { continue }
+        foreach ($item in Get-ChildItem -LiteralPath $root -Force -ErrorAction SilentlyContinue) {
+            if ($item.LinkType -ne 'Junction') { continue }
+            $target = $item.Target
+            if (-not $target -or -not (Test-Path -LiteralPath $target)) { continue }
+            if ($seen.ContainsKey($target)) { continue }
+            $seen[$target] = $true
+            $ver = ''
+            $pkg = Join-Path $target 'package.json'
+            if (Test-Path -LiteralPath $pkg) { try { $ver = [string]((Get-Content -LiteralPath $pkg -Raw -Encoding UTF8 | ConvertFrom-Json).version) } catch { } }
+            $out += @{ name = $item.Name; dir = $target; version = $ver }
+        }
+    }
+    return @($out)
+}
+
+function Test-UndoCodeFile([string]$Name) {
+    if ($script:UndoExcludeNames -contains $Name) { return $false }
+    $ext = ''
+    $idx = $Name.LastIndexOf('.')
+    if ($idx -ge 0) { $ext = $Name.Substring($idx).ToLower() }
+    return ($script:UndoCodeExts -contains $ext)
+}
+
+# Collect code files of one plugin dir (whitelist + size caps).
+# Returns @{ files = @( @{rel;abs;hash;size} ); skipped; dirs; truncated }.
+function Get-UndoPluginTree([string]$Dir) {
+    $files = @(); $skipped = @(); $dirs = @()
+    $total = 0; $truncated = $false
+    $stack = New-Object System.Collections.Stack
+    $stack.Push('')
+    while ($stack.Count -gt 0 -and -not $truncated) {
+        $rel = $stack.Pop()
+        $abs = if ($rel) { Join-Path $Dir $rel } else { $Dir }
+        foreach ($e in Get-ChildItem -LiteralPath $abs -Force -ErrorAction SilentlyContinue) {
+            $r = if ($rel) { "$rel/$($e.Name)" } else { $e.Name }
+            if ($e.PSIsContainer) {
+                if ($script:UndoExcludeDirs -contains $e.Name) { continue }
+                $dirs += $r
+                $stack.Push($r)
+            } else {
+                if (-not (Test-UndoCodeFile $e.Name)) { continue }
+                if ($e.Length -gt $script:UndoMaxFileBytes) { $skipped += @{ path = $r; reason = 'too-large' }; continue }
+                if ($total + $e.Length -gt $script:UndoMaxSnapBytes) { $truncated = $true; break }
+                $h = (Get-FileHash -LiteralPath $e.FullName -Algorithm SHA1).Hash
+                $files += @{ rel = $r; abs = $e.FullName; hash = $h; size = $e.Length }
+                $total += $e.Length
+            }
+        }
+    }
+    return @{ files = @($files); skipped = @($skipped); dirs = @($dirs); truncated = $truncated }
+}
+
+# profile-local code files referenced as `name: './xxx'` in cordis.patch.yml.
+function Get-UndoProfileRefs {
+    $refs = @()
+    $patch = Join-Path $script:UndoProfileRoot 'cordis.patch.yml'
+    if (-not (Test-Path -LiteralPath $patch)) { return @($refs) }
+    $content = Get-Content -LiteralPath $patch -Raw -Encoding UTF8
+    foreach ($m in [regex]::Matches($content, "name:\s*['""]?\./([^'""\s]+)['""]?")) {
+        $rel = $m.Groups[1].Value
+        if ($rel -match '\.\.' -or $rel -match '^[/\\]' -or $rel -match '^[A-Za-z]:') { continue }
+        $abs = Join-Path $script:UndoProfileRoot $rel
+        if (-not (Test-Path -LiteralPath $abs)) { continue }
+        $item = Get-Item -LiteralPath $abs
+        if ($item.PSIsContainer -or $item.Length -gt $script:UndoMaxFileBytes) { continue }
+        $h = (Get-FileHash -LiteralPath $abs -Algorithm SHA1).Hash
+        $refs += @{ path = $rel; hash = $h; size = $item.Length }
+    }
+    return @($refs)
+}
+
+# Shared blob store: <snapshotRoot>/blobs/<sha1> (content-addressed dedup).
+function Get-UndoBlobDir {
+    $settings = Get-UndoSettings
+    return (Join-Path (Split-Path $settings.autoDir -Parent) 'blobs')
+}
+function Add-UndoBlob([string]$Hash, [string]$SrcPath) {
+    $dir = Get-UndoBlobDir
+    $dest = Join-Path $dir $Hash
+    if (Test-Path -LiteralPath $dest) { return }
+    New-Item -ItemType Directory -Force -Path $dir | Out-Null
+    Copy-Item -LiteralPath $SrcPath -Destination $dest -Force
+}
+function Read-UndoBlob([string]$Hash) {
+    $p = Join-Path (Get-UndoBlobDir) $Hash
+    if (Test-Path -LiteralPath $p) { return $p }
+    return $null
 }
 
 function Get-UndoSpecByName([string]$DestName) {
@@ -47,6 +199,7 @@ function Get-UndoSettings {
         keepAuto = 20
         manualDir = $script:UndoManualDir
         autoDir = $script:UndoAutoDir
+        pluginDirs = @()
     }
     if (Test-Path -LiteralPath $script:UndoSettingsFile) {
         try {
@@ -56,6 +209,7 @@ function Get-UndoSettings {
             if ($j.autoEnabled -is [bool]) { $defaults.autoEnabled = $j.autoEnabled }
             if ($j.watchDebounceMs) { $defaults.watchDebounceMs = [int]$j.watchDebounceMs }
             if ($j.keepAuto) { $defaults.keepAuto = [int]$j.keepAuto }
+            if ($j.pluginDirs) { $defaults.pluginDirs = @($j.pluginDirs) }
         } catch { }
     }
     return $defaults
@@ -112,8 +266,25 @@ function New-UndoSnapshot([string]$Kind, [string]$Reason) {
             $fileList += @{ name = (Get-UndoDestName $f); size = (Get-Item -LiteralPath $dest).Length }
         }
     }
-    $manifest = @{ id = $id; time = (Get-Date).ToUniversalTime().ToString('o'); kind = $Kind; reason = $Reason; files = $fileList }
-    $json = $manifest | ConvertTo-Json -Depth 6
+    # v0.2: plugin code trees -> content-addressed blobs, manifest keeps refs
+    $pluginEntries = @()
+    foreach ($p in (Get-UndoPlugins)) {
+        $tree = Get-UndoPluginTree $p.dir
+        $refs = @()
+        foreach ($f in $tree.files) {
+            Add-UndoBlob $f.hash $f.abs
+            $refs += @{ path = $f.rel; hash = $f.hash; size = $f.size }
+        }
+        $pluginEntries += @{ name = $p.name; dir = $p.dir; version = $p.version; files = @($refs); skipped = @($tree.skipped); truncated = $tree.truncated }
+    }
+    # profile-local code files (name: './xxx' in cordis.patch.yml)
+    $profileRefs = @()
+    foreach ($f in (Get-UndoProfileRefs)) {
+        Add-UndoBlob $f.hash (Join-Path $script:UndoProfileRoot $f.path)
+        $profileRefs += @{ path = $f.path; hash = $f.hash; size = $f.size }
+    }
+    $manifest = @{ id = $id; time = (Get-Date).ToUniversalTime().ToString('o'); kind = $Kind; reason = $Reason; files = $fileList; plugins = @($pluginEntries); profileFiles = @($profileRefs) }
+    $json = $manifest | ConvertTo-Json -Depth 8
     [System.IO.File]::WriteAllText((Join-Path $dir 'manifest.json'), $json, (New-Object System.Text.UTF8Encoding($false)))
     return $manifest
 }
@@ -127,6 +298,15 @@ function Get-UndoState([object]$Snap) {
             $pairs += , @($file.name, $h)
         }
     }
+    # v0.2: plugin code trees + profile-local code (hashes come from manifest refs)
+    # NOTE: @($null) is a 1-element array in PowerShell — always filter empties
+    # so OLD snapshots without plugins/profileFiles stay clean.
+    foreach ($p in @($Snap.plugins | Where-Object { $_ })) {
+        foreach ($f in @($p.files | Where-Object { $_ })) { $pairs += , @("plugin:$($p.name)/$($f.path)", $f.hash) }
+    }
+    foreach ($f in @($Snap.profileFiles | Where-Object { $_ -and $_.hash })) {
+        $pairs += , @("profile:$($f.path)", $f.hash)
+    }
     return @($pairs | Sort-Object { $_[0] })
 }
 
@@ -139,6 +319,12 @@ function Get-UndoCurrentState {
             $pairs += , @((Get-UndoDestName $f), $h)
         }
     }
+    # v0.2: plugin code changed without any config change must be undoable too
+    foreach ($p in (Get-UndoPlugins)) {
+        $tree = Get-UndoPluginTree $p.dir
+        foreach ($f in $tree.files) { $pairs += , @("plugin:$($p.name)/$($f.rel)", $f.hash) }
+    }
+    foreach ($f in (Get-UndoProfileRefs)) { $pairs += , @("profile:$($f.path)", $f.hash) }
     return @($pairs | Sort-Object { $_[0] })
 }
 
@@ -176,6 +362,7 @@ function Set-UndoFlag([object]$Snap, [string]$Flag, [bool]$Value) {
 
 function Invoke-UndoApply([object]$Snap) {
     $restored = @()
+    $missing = @()
     foreach ($file in @($Snap.files)) {
         $spec = Get-UndoSpecByName $file.name
         if ($null -eq $spec) { continue }
@@ -185,7 +372,39 @@ function Invoke-UndoApply([object]$Snap) {
         Copy-Item -LiteralPath $src -Destination $dst -Force
         $restored += $file.name
     }
-    return $restored
+    # v0.2: plugin code trees — restore from blobs, only into dirs that are
+    # still live plugins today (safety: never write to arbitrary paths).
+    $live = @{}
+    foreach ($p in (Get-UndoPlugins)) { $live[$p.dir] = $true }
+    foreach ($p in @($Snap.plugins | Where-Object { $_ })) {
+        if (-not $live.ContainsKey($p.dir)) {
+            $missing += "plugin $($p.name): directory no longer present ($($p.dir))"
+            continue
+        }
+        foreach ($f in @($p.files | Where-Object { $_ })) {
+            if ($f.path -match '\.\.' -or $f.path -match '^[/\\]' -or $f.path -match '^[A-Za-z]:') {
+                $missing += "$($p.name)/$($f.path): unsafe path, skipped"
+                continue
+            }
+            $blob = Read-UndoBlob $f.hash
+            if (-not $blob) { $missing += "$($p.name)/$($f.path): snapshot blob missing"; continue }
+            $dst = Join-Path $p.dir $f.path
+            $dstDir = Split-Path $dst -Parent
+            if (-not (Test-Path -LiteralPath $dstDir)) { New-Item -ItemType Directory -Force -Path $dstDir | Out-Null }
+            Copy-Item -LiteralPath $blob -Destination $dst -Force
+            $restored += "plugin:$($p.name)/$($f.path)"
+        }
+    }
+    # profile-local code files
+    foreach ($f in @($Snap.profileFiles | Where-Object { $_ })) {
+        if (-not $f.hash -or $f.path -match '\.\.' -or $f.path -match '^[/\\]' -or $f.path -match '^[A-Za-z]:') { continue }
+        $blob = Read-UndoBlob $f.hash
+        if (-not $blob) { $missing += "profile:$($f.path): snapshot blob missing"; continue }
+        $dst = Join-Path $script:UndoProfileRoot $f.path
+        Copy-Item -LiteralPath $blob -Destination $dst -Force
+        $restored += "profile:$($f.path)"
+    }
+    return @{ restored = @($restored); missing = @($missing) }
 }
 
 function Ensure-UndoMount {
@@ -259,10 +478,10 @@ function Invoke-UndoRestore([string]$Mode, [string]$Id) {
             return @{ ok = $true; unchanged = $true; message = 'Current config already matches every undoable snapshot - no real change since the last snapshot, so there is nothing to undo.' }
         }
         $pre = New-UndoSnapshot 'pre-restore' "before-restore:$($target.s.id) ($($target.s.kind): $($target.s.reason))"
-        $restored = Invoke-UndoApply $target.s
+        $applied = Invoke-UndoApply $target.s
         if ($target -ne $candidates[0]) { Set-UndoFlag $candidates[0].s 'stepped' $true }
         $remounted = Ensure-UndoMount
-        return @{ ok = $true; restored = $restored; targetId = $target.s.id; targetKind = $target.s.kind; targetReason = $target.s.reason; preSnapshotId = $pre.id; remounted = $remounted }
+        return @{ ok = $true; restored = $applied.restored; missing = $applied.missing; targetId = $target.s.id; targetKind = $target.s.kind; targetReason = $target.s.reason; preSnapshotId = $pre.id; remounted = $remounted }
     }
     if ($Mode -eq 'redo') {
         $list = Get-UndoSnapshots
@@ -274,17 +493,17 @@ function Invoke-UndoRestore([string]$Mode, [string]$Id) {
                 return @{ ok = $false; error = 'redo blocked: newer changes exist after the undo' }
             }
         }
-        $restored = Invoke-UndoApply $pre
+        $applied = Invoke-UndoApply $pre
         Set-UndoFlag $pre 'consumed' $true
-        return @{ ok = $true; restored = $restored; targetId = $pre.id; remounted = $false }
+        return @{ ok = $true; restored = $applied.restored; missing = $applied.missing; targetId = $pre.id; remounted = $false }
     }
     # mode 'id'
     $target = Get-UndoSnapshotById $Id
     if ($null -eq $target) { return @{ ok = $false; error = "snapshot not found: $Id" } }
     $pre = New-UndoSnapshot 'pre-restore' "before-restore:$($target.id) ($($target.kind): $($target.reason))"
-    $restored = Invoke-UndoApply $target
+    $applied = Invoke-UndoApply $target
     $remounted = Ensure-UndoMount
-    return @{ ok = $true; restored = $restored; targetId = $target.id; targetKind = $target.kind; targetReason = $target.reason; preSnapshotId = $pre.id; remounted = $remounted }
+    return @{ ok = $true; restored = $applied.restored; missing = $applied.missing; targetId = $target.id; targetKind = $target.kind; targetReason = $target.reason; preSnapshotId = $pre.id; remounted = $remounted }
 }
 
 function Remove-UndoSnapshot([string]$Id) {
@@ -316,6 +535,14 @@ function Export-UndoSnapshots {
                 $count++
             }
         }
+        # v0.2: pack the plugin-code blob store too, or restore breaks after import
+        $blobDir = Get-UndoBlobDir
+        if (Test-Path -LiteralPath $blobDir) {
+            New-Item -ItemType Directory -Force -Path (Join-Path $tmp 'blobs') | Out-Null
+            foreach ($bf in Get-ChildItem -LiteralPath $blobDir -File -Force -ErrorAction SilentlyContinue) {
+                Copy-Item -LiteralPath $bf.FullName -Destination (Join-Path $tmp 'blobs') -Force
+            }
+        }
         Compress-Archive -Path (Join-Path $tmp '*') -DestinationPath $zip -Force
         return @{ ok = $true; path = $zip; count = $count }
     } catch {
@@ -344,6 +571,16 @@ function Import-UndoSnapshots([string]$ZipPath) {
             if (Test-Path -LiteralPath (Join-Path $dest $d.Name)) { $skipped++; continue }
             Copy-Item -LiteralPath $d.FullName -Destination $dest -Recurse -Force
             $imported++
+        }
+        # v0.2: import the blob store (content-addressed; skip existing hashes)
+        $blobTmp = Join-Path $tmp 'blobs'
+        if (Test-Path -LiteralPath $blobTmp) {
+            $destBlob = Get-UndoBlobDir
+            New-Item -ItemType Directory -Force -Path $destBlob | Out-Null
+            foreach ($bf in Get-ChildItem -LiteralPath $blobTmp -File -Force -ErrorAction SilentlyContinue) {
+                $dest = Join-Path $destBlob $bf.Name
+                if (-not (Test-Path -LiteralPath $dest)) { Copy-Item -LiteralPath $bf.FullName -Destination $dest -Force }
+            }
         }
         return @{ ok = $true; imported = $imported; skipped = $skipped; source = $ZipPath }
     } catch {
@@ -387,6 +624,43 @@ function Get-UndoDiffText([string]$Id) {
         $onlyB = @($b | Where-Object { $_ -notin $a })
         if (@($onlyA).Count -eq 0 -and @($onlyB).Count -eq 0) { continue }
         [void]$sb.AppendLine("$((Get-UndoDestName $f)): +$(@($onlyB).Count) -$(@($onlyA).Count)")
+        foreach ($l in ($onlyA | Select-Object -First 20)) { [void]$sb.AppendLine("  - $l") }
+        foreach ($l in ($onlyB | Select-Object -First 20)) { [void]$sb.AppendLine("  + $l") }
+    }
+    # v0.2: plugin code trees + profile-local code
+    foreach ($p in @($target.plugins | Where-Object { $_ })) {
+        foreach ($f in @($p.files | Where-Object { $_ })) {
+            $blob = Read-UndoBlob $f.hash
+            $curPath = Join-Path $p.dir $f.path
+            $hasCur = Test-Path -LiteralPath $curPath
+            if (-not $blob -and -not $hasCur) { continue }
+            $label = "plugin $($p.name)/$($f.path)"
+            if ($blob -and -not $hasCur) { [void]$sb.AppendLine("$label : file was deleted after snapshot"); continue }
+            if (-not $blob -and $hasCur) { [void]$sb.AppendLine("$label : snapshot content unavailable (blob missing)"); continue }
+            $a = @(Get-Content -LiteralPath $blob)
+            $b = @(Get-Content -LiteralPath $curPath)
+            $onlyA = @($a | Where-Object { $_ -notin $b })
+            $onlyB = @($b | Where-Object { $_ -notin $a })
+            if (@($onlyA).Count -eq 0 -and @($onlyB).Count -eq 0) { continue }
+            [void]$sb.AppendLine("$label : +$(@($onlyB).Count) -$(@($onlyA).Count)")
+            foreach ($l in ($onlyA | Select-Object -First 20)) { [void]$sb.AppendLine("  - $l") }
+            foreach ($l in ($onlyB | Select-Object -First 20)) { [void]$sb.AppendLine("  + $l") }
+        }
+    }
+    foreach ($f in @($target.profileFiles | Where-Object { $_ -and $_.hash })) {
+        $blob = Read-UndoBlob $f.hash
+        $curPath = Join-Path $script:UndoProfileRoot $f.path
+        $hasCur = Test-Path -LiteralPath $curPath
+        if (-not $blob -and -not $hasCur) { continue }
+        $label = "profile ./$($f.path)"
+        if ($blob -and -not $hasCur) { [void]$sb.AppendLine("$label : file was deleted after snapshot"); continue }
+        if (-not $blob -and $hasCur) { [void]$sb.AppendLine("$label : snapshot content unavailable (blob missing)"); continue }
+        $a = @(Get-Content -LiteralPath $blob)
+        $b = @(Get-Content -LiteralPath $curPath)
+        $onlyA = @($a | Where-Object { $_ -notin $b })
+        $onlyB = @($b | Where-Object { $_ -notin $a })
+        if (@($onlyA).Count -eq 0 -and @($onlyB).Count -eq 0) { continue }
+        [void]$sb.AppendLine("$label : +$(@($onlyB).Count) -$(@($onlyA).Count)")
         foreach ($l in ($onlyA | Select-Object -First 20)) { [void]$sb.AppendLine("  - $l") }
         foreach ($l in ($onlyB | Select-Object -First 20)) { [void]$sb.AppendLine("  + $l") }
     }

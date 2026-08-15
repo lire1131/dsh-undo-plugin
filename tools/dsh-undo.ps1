@@ -1,4 +1,4 @@
-# dsh-undo.ps1 - external undo/rollback CLI for DSH config (works even when DSH cannot boot)
+﻿# dsh-undo.ps1 - external undo/rollback CLI for DSH config (works even when DSH cannot boot)
 #
 # Usage:
 #   .\dsh-undo.ps1 snapshot [-Label "before installing X"]   # manual save
@@ -56,7 +56,10 @@ switch ($Command) {
         foreach ($s in $list) {
             $t = ([datetime]$s.time).ToLocalTime().ToString('MM-dd HH:mm')
             $mark = if ($s.stepped) { 'stepped' } elseif ($s.consumed) { 'consumed' } else { '' }
-            Write-Host ('{0,-22} {1,-11} {2,-8} {3,-9} {4,-10} {5,-40} {6}' -f $s.id, $s.kind, $t, $s._Store, $mark, ($s.reason | Out-String).Trim(), @($s.files).Count)
+            $pCount = 0
+            foreach ($p in @($s.plugins | Where-Object { $_ })) { $pCount += @($p.files | Where-Object { $_ }).Count }
+            $pCount += @($s.profileFiles | Where-Object { $_ -and $_.hash }).Count
+            Write-Host ('{0,-22} {1,-11} {2,-8} {3,-9} {4,-10} {5,-40} {6}' -f $s.id, $s.kind, $t, $s._Store, $mark, ($s.reason | Out-String).Trim(), (@($s.files).Count + $pCount))
         }
         $settings = Get-UndoSettings
         Write-Host "Manual store: $($settings.manualDir)"
@@ -64,25 +67,8 @@ switch ($Command) {
     }
     'diff' {
         if ([string]::IsNullOrEmpty($Id)) { throw 'diff requires -Id <id|latest>' }
-        $target = if ($Id -eq 'latest') { @(Get-UndoSnapshots)[0] } else { Get-UndoSnapshotById $Id }
-        if ($null -eq $target) { throw "Snapshot not found: $Id" }
-        foreach ($f in $script:UndoFileSpecs) {
-            $snapPath = Join-Path $target._Dir (Get-UndoDestName $f)
-            $curPath = Join-Path $f.Root $f.Name
-            $hasSnap = Test-Path -LiteralPath $snapPath
-            $hasCur = Test-Path -LiteralPath $curPath
-            if (-not $hasSnap -and -not $hasCur) { continue }
-            if ($hasSnap -and -not $hasCur) { Write-Host "$(Get-UndoDestName $f): file did not exist at snapshot time"; continue }
-            if (-not $hasSnap -and $hasCur) { Write-Host "$(Get-UndoDestName $f): NEW file (absent in snapshot)"; continue }
-            $a = @(Get-Content -LiteralPath $snapPath)
-            $b = @(Get-Content -LiteralPath $curPath)
-            $onlyA = @($a | Where-Object { $_ -notin $b })
-            $onlyB = @($b | Where-Object { $_ -notin $a })
-            if (@($onlyA).Count -eq 0 -and @($onlyB).Count -eq 0) { continue }
-            Write-Host "$(Get-UndoDestName $f): snapshot has $(@($onlyA).Count) unique line(s), current has $(@($onlyB).Count) unique line(s)"
-            foreach ($l in ($onlyA | Select-Object -First 6)) { Write-Host "  - (snapshot) $l" }
-            foreach ($l in ($onlyB | Select-Object -First 6)) { Write-Host "  + (current)  $l" }
-        }
+        # 统一走 lib 的 Get-UndoDiffText：配置文件 + 插件代码文件（v0.2）一次输出
+        Write-Host (Get-UndoDiffText $Id)
     }
     'restore' {
         if ([string]::IsNullOrEmpty($Id)) { throw 'restore requires -Id <id|latest>' }
@@ -93,6 +79,7 @@ switch ($Command) {
         Write-Host "Files: $($r.restored -join ', ')"
         Write-Host "Pre-restore safety snapshot: $($r.preSnapshotId)"
         if ($r.remounted) { Write-Host 'dsh-undo mount re-ensured in cordis.patch.yml' }
+        if ($r.missing -and @($r.missing).Count -gt 0) { Write-Host "Not restored: $($r.missing -join ', ')" }
     }
     'remove' {
         if ([string]::IsNullOrEmpty($Id)) { throw 'remove requires -Id <id>' }

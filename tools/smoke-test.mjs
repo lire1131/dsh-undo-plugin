@@ -24,7 +24,7 @@ const ctx = {
   effect: (fn) => { const d = fn(); return d ?? (() => { }); },
   logger: { info: () => { }, warn: (...a) => console.warn('[warn]', ...a) },
 };
-apply(ctx, { manualDir: join(snapDir, 'manual'), autoDir: join(snapDir, 'auto'), homeDir: home, profileDir: profile, watch: false, keepAuto: 2 });
+apply(ctx, { manualDir: join(snapDir, 'manual'), autoDir: join(snapDir, 'auto'), homeDir: home, profileDir: profile, watch: false, keepAuto: 2, pluginDirs: [] });
 // let the async baseline snapshot land before we start asserting
 await new Promise((r) => setTimeout(r, 300));
 
@@ -139,7 +139,7 @@ const ctx2 = {
   effect: (fn) => { const d = fn(); return d ?? (() => { }); },
   logger: { info: () => { }, warn: () => { } },
 };
-apply(ctx2, { manualDir: join(snap2, 'manual'), autoDir: join(snap2, 'auto'), homeDir: home2, profileDir: profile2, watch: false });
+apply(ctx2, { manualDir: join(snap2, 'manual'), autoDir: join(snap2, 'auto'), homeDir: home2, profileDir: profile2, watch: false, pluginDirs: [] });
 await new Promise((r) => setTimeout(r, 300));
 const run2 = async (name, args) => (await tools2.get(name).execute(args, {}));
 await run2('undo_snapshot', { reason: 'dup-a' });
@@ -165,7 +165,7 @@ const ctx3 = {
   systemPrompt: { section: () => () => { } }, get: () => undefined,
   effect: (fn) => { const d = fn(); return d ?? (() => { }); }, logger: { info: () => { }, warn: () => { } },
 };
-apply(ctx3, { manualDir: join(snap3, 'manual'), autoDir: join(snap3, 'auto'), homeDir: home3, profileDir: profile3, watch: false, keepAuto: 2, keepPre: 1 });
+apply(ctx3, { manualDir: join(snap3, 'manual'), autoDir: join(snap3, 'auto'), homeDir: home3, profileDir: profile3, watch: false, keepAuto: 2, keepPre: 1, pluginDirs: [] });
 await new Promise((r) => setTimeout(r, 300));
 const run3 = async (name, args) => (await tools3.get(name).execute(args, {}));
 const set3 = async (v) => writeFile(join(profile3, 'package.json'), v);
@@ -196,7 +196,7 @@ const ctx4 = {
   systemPrompt: { section: () => () => { } }, get: () => undefined,
   effect: (fn) => { const d = fn(); return d ?? (() => { }); }, logger: { info: () => { }, warn: () => { } },
 };
-apply(ctx4, { manualDir: join(snap4, 'manual'), autoDir: join(snap4, 'auto'), homeDir: home4, profileDir: profile4, watch: false, keepAuto: 1, keepPre: 1, autoCleanup: false });
+apply(ctx4, { manualDir: join(snap4, 'manual'), autoDir: join(snap4, 'auto'), homeDir: home4, profileDir: profile4, watch: false, keepAuto: 1, keepPre: 1, autoCleanup: false, pluginDirs: [] });
 await new Promise((r) => setTimeout(r, 300));
 const run4 = async (name, args) => (await tools4.get(name).execute(args, {}));
 const set4 = async (v) => writeFile(join(profile4, 'package.json'), v);
@@ -223,7 +223,7 @@ const ctx5 = {
   systemPrompt: { section: () => () => { } }, get: () => undefined,
   effect: (fn) => { const d = fn(); return d ?? (() => { }); }, logger: { info: () => { }, warn: () => { } },
 };
-apply(ctx5, { manualDir: join(snap5, 'manual'), autoDir: join(snap5, 'auto'), homeDir: home5, profileDir: profile5, watch: false });
+apply(ctx5, { manualDir: join(snap5, 'manual'), autoDir: join(snap5, 'auto'), homeDir: home5, profileDir: profile5, watch: false, pluginDirs: [] });
 await new Promise((r) => setTimeout(r, 300));
 const run5 = async (name, args) => (await tools5.get(name).execute(args, {}));
 out = await run5('undo_list', {});
@@ -245,7 +245,7 @@ const ctx6 = {
   systemPrompt: { section: () => () => { } }, get: () => undefined,
   effect: (fn) => { const d = fn(); return d ?? (() => { }); }, logger: { info: () => { }, warn: () => { } },
 };
-apply(ctx6, { manualDir: join(snap6, 'manual'), autoDir: join(snap6, 'auto'), homeDir: home6, profileDir: profile6, watch: false });
+apply(ctx6, { manualDir: join(snap6, 'manual'), autoDir: join(snap6, 'auto'), homeDir: home6, profileDir: profile6, watch: false, pluginDirs: [] });
 await new Promise((r) => setTimeout(r, 300));
 const run6 = async (name, args) => (await tools6.get(name).execute(args, {}));
 const set6 = async (v) => writeFile(join(profile6, 'package.json'), JSON.stringify({ name: 'dsh-profile-web', dsh: { profile: { bundles: ['dsh-undo-savepoint'] } }, v }));
@@ -271,7 +271,7 @@ const ctx7 = {
   systemPrompt: { section: () => () => { } }, get: () => undefined,
   effect: (fn) => { const d = fn(); return d ?? (() => { }); }, logger: { info: () => { }, warn: () => { } },
 };
-apply(ctx7, { manualDir: join(snap7, 'manual'), autoDir: join(snap7, 'auto'), homeDir: home7, profileDir: profile7, watch: false });
+apply(ctx7, { manualDir: join(snap7, 'manual'), autoDir: join(snap7, 'auto'), homeDir: home7, profileDir: profile7, watch: false, pluginDirs: [] });
 await new Promise((r) => setTimeout(r, 300));
 const run7 = async (name, args) => (await tools7.get(name).execute(args, {}));
 const set7 = async (v) => writeFile(join(profile7, 'package.json'), v);
@@ -288,6 +288,67 @@ check(out.includes('profile-package.json'), 'undo_recent lists the rolled-back f
 out = await run7('undo_recent', { limit: '0' });
 check(out.includes(targetId), 'limit 0 is clamped to 1 (still shows the newest entry)');
 await rm(root7, { recursive: true, force: true });
+
+console.log('== 16. plugin code tree: whitelist, blob dedup, diff, restore (v0.2) ==');
+const root8 = await mkdtemp(join(tmpdir(), 'dsh-undo-test8-'));
+const home8 = join(root8, 'home'), profile8 = join(root8, 'profile'), snap8 = join(root8, 'snaps');
+const plugin8 = join(root8, 'plugin-fake'); // 模拟 D:\dsh\plugins\dsh-xxx
+await mkdir(home8, { recursive: true }); await mkdir(profile8, { recursive: true });
+await mkdir(join(plugin8, 'lib'), { recursive: true });
+await writeFile(join(home8, 'settings.yaml'), 'model: x\n');
+// patch 引用一个 profile 本地代码文件（name: './xxx' 条目）
+await writeFile(join(profile8, 'cordis.patch.yml'), '# patch\n- insert:\n    - id: rg\n      name: \'./router-global.mjs\'\n');
+await writeFile(join(profile8, 'router-global.mjs'), 'export const a = 1;\n');
+await writeFile(join(profile8, 'package.json'), '{"v":1}\n');
+// 插件目录：代码文件 + 资源文件（白名单应排除）+ 超限代码文件（应跳过并记录）
+await writeFile(join(plugin8, 'package.json'), '{"name":"dsh-fake","version":"0.1.0"}\n');
+await writeFile(join(plugin8, 'lib', 'index.js'), 'export const x = 1;\n');
+await writeFile(join(plugin8, 'lib', 'asset.png'), 'PNG-FAKE-DATA\n');
+await writeFile(join(plugin8, 'big.js'), 'J'.repeat(300 * 1024));
+const tools8 = new Map();
+const ctx8 = {
+  tools: { register: (t) => { tools8.set(t.name, t); return () => { }; } },
+  systemPrompt: { section: () => () => { } }, get: () => undefined,
+  effect: (fn) => { const d = fn(); return d ?? (() => { }); }, logger: { info: () => { }, warn: () => { } },
+};
+apply(ctx8, { manualDir: join(snap8, 'manual'), autoDir: join(snap8, 'auto'), homeDir: home8, profileDir: profile8, watch: false, pluginDirs: [plugin8] });
+await new Promise((r) => setTimeout(r, 300));
+const run8 = async (name, args) => (await tools8.get(name).execute(args, {}));
+const blobDir8 = join(snap8, 'blobs');
+await run8('undo_snapshot', { reason: 'plugin-v1' });
+let out8 = await run8('undo_list', {});
+check(out8.includes('plugin file(s)'), 'list shows plugin file count');
+const manualDir8 = join(snap8, 'manual');
+const lastSnap8 = (await readdir(manualDir8)).sort().at(-1);
+const m8 = JSON.parse(await readFile(join(manualDir8, lastSnap8, 'manifest.json'), 'utf8'));
+check(Array.isArray(m8.plugins) && m8.plugins.length === 1, 'manifest has one plugin entry');
+const pf8 = m8.plugins[0].files;
+check(pf8.some((f) => f.path === 'lib/index.js'), 'plugin code file referenced');
+check(!pf8.some((f) => f.path === 'lib/asset.png'), 'asset file excluded by whitelist');
+check(m8.plugins[0].skipped.some((s) => s.path === 'big.js' && s.reason === 'too-large'), 'oversized code file recorded as skipped');
+check(m8.plugins[0].version === '0.1.0', 'plugin version recorded');
+check(m8.profileFiles.some((f) => f.path === 'router-global.mjs'), 'profile-local code file referenced');
+// v1: lib/index.js + plugin package.json + router-global.mjs = 3 blobs
+check((await readdir(blobDir8)).length === 3, 'blobs written (3 unique contents)');
+// 改插件代码 + profile 代码 + 配置 → 再快照 → blob 只新增 2 个（去重生效）
+await writeFile(join(plugin8, 'lib', 'index.js'), 'export const x = 2;\n');
+await writeFile(join(profile8, 'router-global.mjs'), 'export const a = 2;\n');
+await writeFile(join(profile8, 'package.json'), '{"v":2}\n');
+await run8('undo_snapshot', { reason: 'plugin-v2' });
+check((await readdir(blobDir8)).length === 5, 'blob store dedup: only new contents added (3 -> 5)');
+// diff 用 v1 快照（当前是 v2 状态，与 v2 快照无差异）
+const firstSnap8 = (await readdir(manualDir8)).sort()[0];
+out8 = await run8('undo_diff', { snapshot_id: firstSnap8 });
+console.log('   ', out8.split('\n').find((l) => l.includes('plugin')) ?? '(no plugin line)');
+check(out8.includes('plugin plugin-fake/lib/index.js'), 'diff shows plugin file');
+check(out8.includes('profile ./router-global.mjs'), 'diff shows profile-local code file');
+out8 = await run8('undo_restore', { mode: 'undo' });
+console.log('   ', out8.split('\n')[0]);
+check((await readFile(join(plugin8, 'lib', 'index.js'), 'utf8')).includes('x = 1'), 'plugin code file restored');
+check((await readFile(join(profile8, 'router-global.mjs'), 'utf8')).includes('a = 1'), 'profile-local code restored');
+check((await readFile(join(profile8, 'package.json'), 'utf8')).includes('"v":1'), 'config restored together');
+check(out8.includes('plugin:plugin-fake/lib/index.js'), 'report lists the plugin file');
+await rm(root8, { recursive: true, force: true });
 
 await rm(root, { recursive: true, force: true });
 console.log(`\n== RESULT: ${pass} passed, ${fail} failed ==`);

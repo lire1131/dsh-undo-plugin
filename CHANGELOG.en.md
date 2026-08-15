@@ -2,6 +2,23 @@
 
 Notable changes to dsh-undo-savepoint. Dates are in local time (UTC+8). 中文版:[CHANGELOG.md](CHANGELOG.md)
 
+## [0.2.0] - 2026-08-15
+
+### Added (plugin-code-level rollback, phase 1)
+- **Plugin code tree snapshots**: auto-discovers user plugins (junctions under `node_modules`, e.g. `D:\dsh\plugins\*`) plus profile-local code files (`name: './xxx'` entries in `cordis.patch.yml`, e.g. `router-global.mjs`) — a broken plugin EDIT is now undoable even when no config file changed (e.g. the whale-kit "yield* is not async iterable" incident)
+- **4 size safeguards**: extension whitelist (only code/config files — assets like gif/png never enter snapshots; dsh-pet 57MB -> ~47KB), content-addressed blob store (`<snapshotRoot>/blobs`, unchanged files cost nothing), per-file / per-snapshot caps (oversized files recorded as `skipped`), restore resolves by reference (missing blobs reported explicitly)
+- **Plugin-file diff**: `undo_diff` and the WebUI diff preview show `plugin:xxx` / `profile:xxx` entries
+- **Plugin watcher**: code changes in plugin trees auto-snapshot as `plugin-code-change`; the restore's own writes are echo-suppressed
+- **Single source of truth `lib/spec.json`**: Node and PowerShell tooling share one snapshot-scope definition
+- **`pluginDirs` setting**: explicit plugin whitelist (`[]` disables auto-discovery for tests/isolated use)
+- **Export/import include the blob store**: restores keep working after backup/migration
+- Manifest records plugin name/version/skips; `undo_list` shows plugin file counts; restore reports `missing` items
+
+### Fixed
+- Old snapshots (no `plugins` field) polluted state/diff under the PowerShell tools via the `@($null)` single-element-array trap (now filtered)
+- Offline CLI `diff` now uses the shared `Get-UndoDiffText` implementation (plugin files included)
+- ps1 files saved as UTF-8 with BOM so PowerShell 5.1 parses the Chinese comments correctly
+
 ## [0.1.1] - 2026-08-15
 
 ### Added
