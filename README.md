@@ -61,6 +61,18 @@
 
 > ⚠️ 快照含 `.env` 等配置副本,可能含密钥——不要外传。
 
+## 多 profile 支持(v0.3.3)
+
+插件从启动参数自动识别当前 profile(`dsh --profile mine` / `--profile=mine`;`dsh web` 回退为 `web`),并按当前 profile 工作:
+
+- **配置目录**:默认 `~/.dsh/profiles/<当前 profile>`(此前硬编码 `web`——非 web profile 下快照读错、监听错、恢复写错位置);
+- **快照仓库**:默认 `<快照根>/<当前 profile>/{auto,manual}`(按 profile 隔离);作用域目录不存在而旧版平铺目录存在时自动回退平铺,旧快照不会"隐身";
+- **归属标识**:快照 manifest 记录 `profile` 字段,`undo_list` 显示当前 profile。
+
+离线 CLI/GUI 看不到启动参数,通过环境变量 `DSH_UNDO_PROFILE` 或 settings 里的 `profileName` 指定(默认 `web`)。
+
+显式配置优先级不变:`profileDir` / `manualDir` / `autoDir` / `profileName`(config 或 settings)始终生效。
+
 ## 安装
 
 前置:已安装 DSH(`@deepseek-ai/dsh`)与 Node.js(≥20)。

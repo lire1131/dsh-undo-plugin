@@ -5,16 +5,34 @@
 #
 # Store layout (mirrors lib/index.js): defaults are based on the user home
 # directory (no hardcoded author paths — see issue #1); values stored in the
-# settings file take precedence via Get-UndoSettings.
+# settings file take precedence via Get-UndoSettings. The same environment
+# overrides as the Node plugin are honored (DSH_UNDO_ROOT / DSH_UNDO_SETTINGS).
 
-$script:UndoSnapshotRoot = Join-Path $env:USERPROFILE '.dsh\undo-snapshots'
+$script:UndoSnapshotRoot = if ($env:DSH_UNDO_ROOT) { $env:DSH_UNDO_ROOT } else { Join-Path $env:USERPROFILE '.dsh\undo-snapshots' }
 $script:UndoLegacyRoot = $script:UndoSnapshotRoot
 $script:UndoManualDir = Join-Path $script:UndoSnapshotRoot 'manual'
 $script:UndoAutoDir = Join-Path $script:UndoSnapshotRoot 'auto'
-$script:UndoHome = Join-Path $env:USERPROFILE '.dsh\undo'
-$script:UndoSettingsFile = Join-Path $script:UndoHome 'settings.json'
+$script:UndoHome = if ($env:DSH_UNDO_SETTINGS) { Split-Path $env:DSH_UNDO_SETTINGS -Parent } else { Join-Path $env:USERPROFILE '.dsh\undo' }
+$script:UndoSettingsFile = if ($env:DSH_UNDO_SETTINGS) { $env:DSH_UNDO_SETTINGS } else { Join-Path $script:UndoHome 'settings.json' }
 $script:UndoHomeRoot = Join-Path $env:USERPROFILE '.dsh'
-$script:UndoProfileRoot = Join-Path $script:UndoHomeRoot 'profiles\web'
+# v0.3.3 (issue #3): multi-profile support. The offline tools cannot see the
+# CLI argv, so the profile name comes from $env:DSH_UNDO_PROFILE or the
+# settings file (profileName), defaulting to 'web'.
+$script:UndoProfileName = if ($env:DSH_UNDO_PROFILE) { $env:DSH_UNDO_PROFILE } else { 'web' }
+$script:UndoProfileRoot = Join-Path $script:UndoHomeRoot "profiles\$script:UndoProfileName"
+
+# Store defaults per profile with legacy fallback (mirrors resolveStoreRoots
+# in lib/index.js): use <root>/<profile>/{auto,manual} when it exists or when
+# no flat store exists; otherwise keep the flat store (don't hide old data).
+function Get-UndoStoreDefaults {
+    $scoped = Join-Path $script:UndoSnapshotRoot $script:UndoProfileName
+    $hasScoped = (Test-Path -LiteralPath (Join-Path $scoped 'auto')) -or (Test-Path -LiteralPath (Join-Path $scoped 'manual'))
+    $hasFlat = (Test-Path -LiteralPath (Join-Path $script:UndoSnapshotRoot 'auto')) -or (Test-Path -LiteralPath (Join-Path $script:UndoSnapshotRoot 'manual'))
+    if ($hasScoped -or -not $hasFlat) {
+        return @{ manualDir = (Join-Path $scoped 'manual'); autoDir = (Join-Path $scoped 'auto') }
+    }
+    return @{ manualDir = (Join-Path $script:UndoSnapshotRoot 'manual'); autoDir = (Join-Path $script:UndoSnapshotRoot 'auto') }
+}
 
 # Must mirror FILE_SPECS in the dsh-undo-savepoint plugin (lib/index.js).
 # v0.2: the real source of truth is lib/spec.json (module 7) — this built-in
@@ -301,16 +319,18 @@ function Get-UndoFileSpecByBase([string]$BaseName) {
 }
 
 function Get-UndoSettings {
+    $storeDefaults = Get-UndoStoreDefaults
     $defaults = @{
         autoEnabled = $true
         watchDebounceMs = 1500
         keepAuto = 20
         keepPre = 10
         autoCleanup = $true
-        manualDir = $script:UndoManualDir
-        autoDir = $script:UndoAutoDir
+        manualDir = $storeDefaults.manualDir
+        autoDir = $storeDefaults.autoDir
         pluginDirs = @()
         sensitiveMode = 'redact'
+        profileName = $script:UndoProfileName
     }
     if (Test-Path -LiteralPath $script:UndoSettingsFile) {
         try {
@@ -326,6 +346,18 @@ function Get-UndoSettings {
             if ($null -ne $j.autoCleanup) { $defaults.autoCleanup = [bool]$j.autoCleanup }
             if ($j.pluginDirs) { $defaults.pluginDirs = @($j.pluginDirs) }
             if ($j.sensitiveMode) { $defaults.sensitiveMode = $j.sensitiveMode }
+            # v0.3.3 (issue #3): settings.profileName overrides the default;
+            # then recompute store defaults UNLESS explicit dirs are present
+            if ($j.profileName) {
+                $defaults.profileName = $j.profileName
+                $script:UndoProfileName = $j.profileName
+                $script:UndoProfileRoot = Join-Path $script:UndoHomeRoot "profiles\$($script:UndoProfileName)"
+                if (-not $j.manualDir -or -not $j.autoDir) {
+                    $storeDefaults = Get-UndoStoreDefaults
+                    if (-not $j.manualDir) { $defaults.manualDir = $storeDefaults.manualDir }
+                    if (-not $j.autoDir) { $defaults.autoDir = $storeDefaults.autoDir }
+                }
+            }
         } catch { }
     }
     return $defaults

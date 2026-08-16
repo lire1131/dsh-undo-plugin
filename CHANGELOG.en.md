@@ -2,6 +2,24 @@
 
 Notable changes to dsh-undo-savepoint. Dates are in local time (UTC+8). 中文版:[CHANGELOG.md](CHANGELOG.md)
 
+## [0.3.3] - 2026-08-16
+
+### Added
+- **Multi-profile support** (issue #3): the current profile is parsed from `process.argv` (`--profile mine` / `--profile=mine`; `dsh web` falls back to `web`), overridable via `config.profileName`
+  - `profileDir` now defaults to the CURRENT profile directory (previously hardcoded to `web` — under any other profile snapshots read the wrong files, the watcher missed changes, and restores wrote to the wrong place)
+  - Snapshot stores are per-profile: `<snapshotRoot>/<profileName>/{auto,manual}`; legacy fallback keeps working — if the scoped dir does not exist but the old flat store does, the flat store is used (old data never hidden)
+  - manifest gains a `profile` field; `undo_list` shows the current profile
+  - Offline CLI/GUI: `DSH_UNDO_PROFILE` env var or `profileName` in settings (offline tools cannot see argv)
+  - Explicit config (`profileDir` / `manualDir` / `autoDir` / `profileName`) still wins
+- **ps1 offline tools honor `DSH_UNDO_ROOT` / `DSH_UNDO_SETTINGS`** (matching the Node plugin; previously the CLI only knew the default paths, so custom-store users got out of sync offline)
+- **package.json declares `dsh.runtime: "host"`** (WhaleHarness audit gate: using child_process requires the host runtime declaration)
+
+### Fixed
+- settings.json default-location migration: data configured at the legacy location (e.g. `D:\dsh\undo\settings.json`) no longer goes "missing" — the new location reads it and keeps using the configured directories
+
+### Tests
+- smoke 98 → 101 (argv parsing / manifest profile / explicit profileName override); e2e 10/10
+
 ## [0.3.2] - 2026-08-15
 
 ### Added

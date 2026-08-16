@@ -577,6 +577,53 @@ check(out.includes('orphan blob'), 'prune reports orphan blob cleanup');
 check((await readdir(blobDir14)).length === 0, 'orphan blob removed');
 await rm(root14, { recursive: true, force: true });
 
+console.log('== 22. multi-profile support: argv parse + manifest profile (v0.3.3) ==');
+const root15 = await mkdtemp(join(tmpdir(), 'dsh-undo-test15-'));
+const home15 = join(root15, 'home'), profile15 = join(root15, 'profiles', 'mine'), snap15 = join(root15, 'snaps');
+await mkdir(home15, { recursive: true }); await mkdir(profile15, { recursive: true });
+await writeFile(join(home15, 'settings.yaml'), 'model: x\n');
+await writeFile(join(profile15, 'cordis.patch.yml'), '# patch\n[]\n');
+// 模拟 `dsh --profile mine` 启动：临时向 argv 注入 --profile
+const savedArgv = process.argv.slice();
+process.argv.push('--profile', 'mine');
+const tools15 = new Map();
+const ctx15 = {
+  tools: { register: (t) => { tools15.set(t.name, t); return () => { }; } },
+  systemPrompt: { section: () => () => { } }, get: () => undefined,
+  effect: (fn) => { const d = fn(); return d ?? (() => { }); }, logger: { info: () => { }, warn: () => { } },
+};
+apply(ctx15, { manualDir: join(snap15, 'manual'), autoDir: join(snap15, 'auto'), homeDir: home15, profileDir: profile15, pluginDirs: [] });
+process.argv = savedArgv;
+await new Promise((r) => setTimeout(r, 300));
+const run15 = async (name, args) => (await tools15.get(name).execute(args, {}));
+await run15('undo_snapshot', { reason: 's1' });
+const m15dir = (await readdir(join(snap15, 'manual'))).find((d) => d !== '.booting');
+const m15 = JSON.parse(await readFile(join(snap15, 'manual', m15dir, 'manifest.json'), 'utf8'));
+check(m15.profile === 'mine', 'manifest records the parsed profile name');
+out = await run15('undo_list', {});
+check(out.includes('Profile: mine'), 'undo_list shows the current profile');
+await rm(root15, { recursive: true, force: true });
+
+console.log('== 22b. multi-profile: explicit config.profileName wins (v0.3.3) ==');
+const root16 = await mkdtemp(join(tmpdir(), 'dsh-undo-test16-'));
+const home16 = join(root16, 'home'), snap16 = join(root16, 'snaps');
+await mkdir(home16, { recursive: true });
+await writeFile(join(home16, 'settings.yaml'), 'model: x\n');
+const tools16 = new Map();
+const ctx16 = {
+  tools: { register: (t) => { tools16.set(t.name, t); return () => { }; } },
+  systemPrompt: { section: () => () => { } }, get: () => undefined,
+  effect: (fn) => { const d = fn(); return d ?? (() => { }); }, logger: { info: () => { }, warn: () => { } },
+};
+apply(ctx16, { manualDir: join(snap16, 'manual'), autoDir: join(snap16, 'auto'), homeDir: home16, profileDir: join(root16, 'profiles', 'work'), pluginDirs: [], profileName: 'work' });
+await new Promise((r) => setTimeout(r, 300));
+const run16 = async (name, args) => (await tools16.get(name).execute(args, {}));
+await run16('undo_snapshot', { reason: 's1' });
+const m16dir = (await readdir(join(snap16, 'manual'))).find((d) => d !== '.booting');
+const m16 = JSON.parse(await readFile(join(snap16, 'manual', m16dir, 'manifest.json'), 'utf8'));
+check(m16.profile === 'work', 'explicit profileName overrides argv');
+await rm(root16, { recursive: true, force: true });
+
 await rm(root, { recursive: true, force: true });
 console.log(`\n== RESULT: ${pass} passed, ${fail} failed ==`);
 process.exit(fail > 0 ? 1 : 0);

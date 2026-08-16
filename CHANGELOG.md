@@ -2,6 +2,24 @@
 
 dsh-undo-savepoint 的重要变更。日期为本地时间(UTC+8)。English version: [CHANGELOG.en.md](CHANGELOG.en.md)
 
+## [0.3.3] - 2026-08-16
+
+### 新增
+- **多 profile 支持**（issue #3）：从 `process.argv` 解析当前 profile（`--profile mine` / `--profile=mine`，`dsh web` 回退 `web`），`config.profileName` 可显式覆盖
+  - `profileDir` 默认改为当前 profile 目录（此前硬编码 `web`——非 web profile 下快照读错、watcher 漏监听、恢复写错位置）
+  - 快照仓库按 profile 隔离：`<快照根>/<profileName>/{auto,manual}`；兼容旧数据——profile 作用域目录不存在而旧平铺目录存在时自动回退平铺（不隐身旧快照）
+  - manifest 增加 `profile` 字段，`undo_list` 显示当前 profile
+  - 离线 CLI/GUI 同步：`DSH_UNDO_PROFILE` 环境变量或 settings `profileName` 指定（离线无法看到 argv）
+  - 显式配置（`profileDir` / `manualDir` / `autoDir` / `profileName`）优先级不变
+- **ps1 离线工具支持 `DSH_UNDO_ROOT` / `DSH_UNDO_SETTINGS` 环境变量**（与 Node 插件对齐；此前 ps1 只认默认路径，自定义库用户离线工具会错位）
+- **package.json 声明 `dsh.runtime: "host"`**（WhaleHarness 审计门槛：使用 child_process 必须声明 host runtime）
+
+### 修复
+- settings.json 默认位置迁移兼容：旧位置（如 `D:\dsh\undo\settings.json`）配置的数据不再"隐身"——新位置读取后按配置目录继续工作
+
+### 测试
+- smoke 98 → 101（argv 解析 / manifest profile 字段 / 显式 profileName 覆盖）；e2e 10/10
+
 ## [0.3.2] - 2026-08-15
 
 ### 新增

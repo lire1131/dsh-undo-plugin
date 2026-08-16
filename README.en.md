@@ -59,6 +59,18 @@ The snapshot captures DSH's 6 config files: `cordis.patch.yml`, `package.json`, 
 
 > ⚠️ Snapshots contain copies of `.env` etc. which may include secrets — do not share or push them.
 
+## Multi-profile support (v0.3.3)
+
+The plugin detects the active DSH profile from the launch arguments (`dsh --profile mine` / `--profile=mine`; `dsh web` falls back to `web`) and works per profile:
+
+- **Config directory**: defaults to `~/.dsh/profiles/<current profile>` (previously hardcoded to `web` — under any other profile snapshots read the wrong files, the watcher missed changes, and restores wrote to the wrong place);
+- **Snapshot stores**: default to `<snapshot root>/<current profile>/{auto,manual}` (per-profile isolation); if the scoped dir does not exist but the old flat store does, the flat store is used so legacy snapshots are never hidden;
+- **Provenance**: the manifest records a `profile` field and `undo_list` shows the current profile.
+
+Offline CLI/GUI cannot see the launch arguments — set the `DSH_UNDO_PROFILE` environment variable or `profileName` in settings (default `web`).
+
+Explicit configuration always wins: `profileDir` / `manualDir` / `autoDir` / `profileName` (config or settings).
+
 ## Installation
 
 Prerequisites: DSH (`@deepseek-ai/dsh`) and Node.js (≥20).
