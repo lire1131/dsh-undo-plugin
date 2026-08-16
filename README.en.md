@@ -10,6 +10,10 @@ An undo/rollback system for [DeepSeek Harness (DSH)](https://github.com/deepseek
 
 ## Preview
 
+| v0.3.4 conversation header: iconized Undo / Redo / Snapshots buttons + auto-snapshot status badge (click the badge to open the panel) |
+|---|
+| ![header](docs/webui-header.png) |
+
 | WebUI snapshot manager (diff / restore / delete / clean-up / export / import / SAFE MODE) | WebUI Settings — own "Snapshots" section (sensitive mode / plugin whitelist / dir pickers) |
 |---|---|
 | ![panel](docs/webui-panel.png) | ![settings](docs/webui-settings-section.png) |

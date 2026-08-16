@@ -12,6 +12,10 @@
 
 ## 预览
 
+| v0.3.4 会话头部:撤销/恢复/快照按钮全部图标化 + 自动快照状态徽章(点击徽章打开快照面板) |
+|---|
+| ![header](docs/webui-header.png) |
+
 | WebUI 快照管理面板(差异/回退/删除/清理/导出/导入/安全模式) | WebUI 设置「快照」独立栏目(敏感模式/插件白名单/目录选择) |
 |---|---|
 | ![panel](docs/webui-panel.png) | ![settings](docs/webui-settings-section.png) |
