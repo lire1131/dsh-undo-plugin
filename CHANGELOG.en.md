@@ -2,7 +2,7 @@
 
 Notable changes to dsh-undo-savepoint. Dates are in local time (UTC+8). 中文版:[CHANGELOG.md](CHANGELOG.md)
 
-## [0.3.3.1] - 2026-08-16
+## [0.3.4] - 2026-08-16
 
 ### Added
 - **WebUI snapshot entry points overhaul** (replaces community PR #4's two-tiny-camera-icons approach with a full UI pass):

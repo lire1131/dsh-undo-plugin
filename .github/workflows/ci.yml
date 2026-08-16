@@ -16,6 +16,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
+      - name: Validate package version (semver)
+        run: node tools/check-version.mjs
       - name: Install peer dependency for tests
         run: npm install --no-save @deepseek-ai/dsh-tools
       - name: Smoke tests

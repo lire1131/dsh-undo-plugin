@@ -2,7 +2,7 @@
 
 dsh-undo-savepoint 的重要变更。日期为本地时间(UTC+8)。English version: [CHANGELOG.en.md](CHANGELOG.en.md)
 
-## [0.3.3.1] - 2026-08-16
+## [0.3.4] - 2026-08-16
 
 ### 新增
 - **WebUI 快照入口全面增强**（替换社区 PR #4 的"两个小相机图标"方案，改为成套 UI）：
