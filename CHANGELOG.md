@@ -2,7 +2,7 @@
 
 dsh-undo-savepoint 的重要变更。日期为本地时间(UTC+8)。English version: [CHANGELOG.en.md](CHANGELOG.en.md)
 
-## [Unreleased]
+## [0.3.3.1] - 2026-08-16
 
 ### 新增
 - **WebUI 快照入口全面增强**（替换社区 PR #4 的"两个小相机图标"方案，改为成套 UI）：
@@ -11,6 +11,12 @@ dsh-undo-savepoint 的重要变更。日期为本地时间(UTC+8)。English vers
   - 头部新增**自动快照状态徽章**：绿点 + 「已存 N 份快照 · 最近 xx 分钟前」，30 秒自动轮询刷新（配置一改、自动快照落地，徽章即刻变化）；**点击徽章 = 打开快照面板**
   - 快照面板头部：相机图标 + 标题 + 当前 profile 副标题（取自最新快照 manifest 的 `profile` 字段，v0.3.3 多 profile 成果的可见化）
 - 纯客户端改动（`lib/client.js`），host 端与快照逻辑零改动
+
+### 修复
+- **会话运行中禁止撤销/恢复/回滚/安全模式切换**：有任何 live 会话处于 open turn（agent 正在执行）时，undo/redo/restore 与 safe-mode on/off 一律拒绝并给出明确提示（host 端安全闸 + WebUI 专属提示）。此前撤销会写回 `cordis.patch.yml`、触发 DSH 内置 HMR 热重建插件树，导致所有正在跑的会话一起中断、无法恢复（用户反馈的"误点撤销导致整个工作区崩溃"）；空闲时行为完全不变
+
+### 测试
+- smoke 101 → 106（运行中守卫：open turn 拒绝且配置未被回滚 / safe-mode 拒绝且 patch 未被改写 / closed turn 放行）
 
 ## [0.3.3] - 2026-08-16
 

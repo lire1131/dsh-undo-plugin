@@ -2,7 +2,7 @@
 
 Notable changes to dsh-undo-savepoint. Dates are in local time (UTC+8). 中文版:[CHANGELOG.md](CHANGELOG.md)
 
-## [Unreleased]
+## [0.3.3.1] - 2026-08-16
 
 ### Added
 - **WebUI snapshot entry points overhaul** (replaces community PR #4's two-tiny-camera-icons approach with a full UI pass):
@@ -11,6 +11,12 @@ Notable changes to dsh-undo-savepoint. Dates are in local time (UTC+8). 中文�
   - New **auto-snapshot status badge** in the header: green dot + "N snapshot(s) · x min ago", auto-refreshing every 30 s (the badge updates the moment a config change lands as an auto-snapshot); **clicking the badge opens the snapshot panel**
   - Snapshot-panel header: camera icon + title + current-**profile** subtitle (read from the newest snapshot's manifest `profile` field — making the v0.3.3 multi-profile support visible)
 - Client-only change (`lib/client.js`); host logic and snapshots untouched
+
+### Fixed
+- **Undo/redo/restore/safe-mode are rejected while any live session has an open turn (agent in progress)**: the operation is refused with a clear message (host-side guard + WebUI-specific notice). Previously an undo rewrote `cordis.patch.yml` and triggered DSH's built-in HMR plugin-tree rebuild, interrupting every running session beyond recovery (the reported "accidental undo crashed the whole workspace"); behavior is fully unchanged when idle
+
+### Tests
+- smoke 101 → 106 (running-session guard: open turn rejected and config untouched / safe-mode rejected and patch untouched / closed turn allowed)
 
 ## [0.3.3] - 2026-08-16
 

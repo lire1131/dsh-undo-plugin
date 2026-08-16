@@ -624,6 +624,54 @@ const m16 = JSON.parse(await readFile(join(snap16, 'manual', m16dir, 'manifest.j
 check(m16.profile === 'work', 'explicit profileName overrides argv');
 await rm(root16, { recursive: true, force: true });
 
+console.log('== 23. running-session guard: undo/redo/restore/safe-mode rejected while a turn is open (HMR bomb fix) ==');
+const root17 = await mkdtemp(join(tmpdir(), 'dsh-undo-test17-'));
+const home17 = join(root17, 'home'), profile17 = join(root17, 'profile'), snap17 = join(root17, 'snaps');
+await mkdir(home17, { recursive: true }); await mkdir(profile17, { recursive: true });
+await writeFile(join(home17, 'settings.yaml'), 'model: x\n');
+await writeFile(join(profile17, 'cordis.patch.yml'), '# patch\n[]\n');
+await writeFile(join(profile17, 'package.json'), '{"v":1}\n');
+// fake session store: one session with an OPEN turn (turn/start without turn/end = agent in progress)
+const busyStore = { list: () => [{ id: 's1', events: [{ type: 'turn/start', data: { turn: 1 } }] }] };
+const tools17 = new Map();
+const ctx17 = {
+  tools: { register: (t) => { tools17.set(t.name, t); return () => { }; } },
+  systemPrompt: { section: () => () => { } },
+  get: (key) => (key === 'session' ? busyStore : undefined),
+  effect: (fn) => { const d = fn(); return d ?? (() => { }); }, logger: { info: () => { }, warn: () => { } },
+};
+apply(ctx17, { manualDir: join(snap17, 'manual'), autoDir: join(snap17, 'auto'), homeDir: home17, profileDir: profile17, watch: false, pluginDirs: [] });
+await new Promise((r) => setTimeout(r, 300));
+const run17 = async (name, args) => (await tools17.get(name).execute(args, {}));
+const set17 = async (v) => writeFile(join(profile17, 'package.json'), v);
+await run17('undo_snapshot', { reason: 's1' });
+await set17('{"v":2}\n');
+await run17('undo_snapshot', { reason: 's2' });
+out = await run17('undo_restore', { mode: 'undo' });
+console.log('   ', out.split('\n')[0]);
+check(out.includes('有会话正在运行'), 'undo_restore rejected while a turn is open (busy)');
+check((await readFile(join(profile17, 'package.json'), 'utf8')).includes('"v":2'), 'config NOT rolled back while busy');
+out = await run17('undo_safe_mode', { action: 'on' });
+console.log('   ', out.split('\n')[0]);
+check(out.includes('有会话正在运行'), 'safe mode rejected while a turn is open (busy)');
+check(!(await readFile(join(profile17, 'cordis.patch.yml'), 'utf8')).includes('SAFE MODE'), 'patch NOT rewritten while busy');
+// closed-turn session -> guard must NOT fire (idle behavior unchanged)
+const closedStore = { list: () => [{ id: 's2', events: [{ type: 'turn/start', data: { turn: 1 } }, { type: 'turn/end', data: { turn: 1 } }] }] };
+const tools17b = new Map();
+const ctx17b = {
+  tools: { register: (t) => { tools17b.set(t.name, t); return () => { }; } },
+  systemPrompt: { section: () => () => { } },
+  get: (key) => (key === 'session' ? closedStore : undefined),
+  effect: (fn) => { const d = fn(); return d ?? (() => { }); }, logger: { info: () => { }, warn: () => { } },
+};
+apply(ctx17b, { manualDir: join(snap17, 'manual'), autoDir: join(snap17, 'auto'), homeDir: home17, profileDir: profile17, watch: false, pluginDirs: [] });
+await new Promise((r) => setTimeout(r, 300));
+const run17b = async (name, args) => (await tools17b.get(name).execute(args, {}));
+out = await run17b('undo_restore', { mode: 'undo' });
+console.log('   ', out.split('\n')[0]);
+check(out.includes('Restored snapshot'), 'undo proceeds when the last turn is closed (not busy)');
+await rm(root17, { recursive: true, force: true });
+
 await rm(root, { recursive: true, force: true });
 console.log(`\n== RESULT: ${pass} passed, ${fail} failed ==`);
 process.exit(fail > 0 ? 1 : 0);
