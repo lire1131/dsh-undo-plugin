@@ -2,6 +2,11 @@
 
 Notable changes to dsh-undo-savepoint. Dates are in local time (UTC+8). 中文版:[CHANGELOG.md](CHANGELOG.md)
 
+## [Unreleased]
+
+### Added
+- **Camera icon on the snapshot entry points**: the conversation-header "Snapshots" button and the snapshot-manager panel title now carry a camera glyph in the official DSH filled-icon style (16×16 monochrome `currentColor`: body outline + viewfinder hump + lens ring, adapts to the theme color; the `CameraIcon` component is reusable)
+
 ## [0.3.3] - 2026-08-16
 
 ### Added

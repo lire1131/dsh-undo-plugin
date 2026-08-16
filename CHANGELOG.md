@@ -2,6 +2,11 @@
 
 dsh-undo-savepoint 的重要变更。日期为本地时间(UTC+8)。English version: [CHANGELOG.en.md](CHANGELOG.en.md)
 
+## [Unreleased]
+
+### 新增
+- **快照入口相机图标**：会话头部「快照」按钮与快照管理面板标题新增官方填充式风格的相机图标（16×16 单色 `currentColor`，机身轮廓 + 取景器凸起 + 镜头圆环，随主题色自适应；`CameraIcon` 组件可复用）
+
 ## [0.3.3] - 2026-08-16
 
 ### 新增
