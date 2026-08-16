@@ -2,6 +2,16 @@
 
 Notable changes to dsh-undo-savepoint. Dates are in local time (UTC+8). 中文版:[CHANGELOG.md](CHANGELOG.md)
 
+## [Unreleased]
+
+### Added
+- **WebUI snapshot entry points overhaul** (replaces community PR #4's two-tiny-camera-icons approach with a full UI pass):
+  - The conversation-header **Undo / Redo / Snapshots** buttons are all iconized (red ↶ / green ↷ / camera; monochrome `currentColor`, theme-adaptive)
+  - The **Snapshots button now performs a one-click manual snapshot** (equivalent to the panel's Save; the header flashes "Snapshot <id>" on success) instead of opening the panel
+  - New **auto-snapshot status badge** in the header: green dot + "N snapshot(s) · x min ago", auto-refreshing every 30 s (the badge updates the moment a config change lands as an auto-snapshot); **clicking the badge opens the snapshot panel**
+  - Snapshot-panel header: camera icon + title + current-**profile** subtitle (read from the newest snapshot's manifest `profile` field — making the v0.3.3 multi-profile support visible)
+- Client-only change (`lib/client.js`); host logic and snapshots untouched
+
 ## [0.3.3] - 2026-08-16
 
 ### Added
