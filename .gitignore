@@ -20,6 +20,9 @@ yarn-error.log*
 *.undo-tmp
 *.tmp
 
+# npm pack artifacts
+*.tgz
+
 # OS files
 Thumbs.db
 Desktop.ini
