@@ -3,18 +3,22 @@
 # Works WITHOUT DSH running: reads/writes the same snapshot stores and the
 # same manifest format as the dsh-undo-savepoint DSH plugin.
 #
-# Store layout (mirrors lib/index.js): defaults are based on the user home
-# directory (no hardcoded author paths — see issue #1); values stored in the
-# settings file take precedence via Get-UndoSettings. The same environment
-# overrides as the Node plugin are honored (DSH_UNDO_ROOT / DSH_UNDO_SETTINGS).
+# Store layout (mirrors lib/index.js): defaults are based on the DSH home
+# directory (issue #6: prefer $env:DSH_HOME, fall back to ~/.dsh). Values
+# stored in the settings file take precedence via Get-UndoSettings. The same
+# environment overrides as the Node plugin are honored (DSH_UNDO_ROOT / DSH_UNDO_SETTINGS).
 
-$script:UndoSnapshotRoot = if ($env:DSH_UNDO_ROOT) { $env:DSH_UNDO_ROOT } else { Join-Path $env:USERPROFILE '.dsh\undo-snapshots' }
+# Issue #6: DSH home = DSH_HOME env (non-empty) or ~/.dsh — mirrors DSH's
+# own resolveDshHome() in @deepseek-ai/dsh-home-paths. Empty/whitespace-only
+# DSH_HOME is treated as unset (never resolves home to cwd).
+$script:DshHome = if ($env:DSH_HOME -and $env:DSH_HOME.Trim().Length -gt 0) { $env:DSH_HOME } else { Join-Path $env:USERPROFILE '.dsh' }
+$script:UndoSnapshotRoot = if ($env:DSH_UNDO_ROOT) { $env:DSH_UNDO_ROOT } else { Join-Path $script:DshHome 'undo-snapshots' }
 $script:UndoLegacyRoot = $script:UndoSnapshotRoot
 $script:UndoManualDir = Join-Path $script:UndoSnapshotRoot 'manual'
 $script:UndoAutoDir = Join-Path $script:UndoSnapshotRoot 'auto'
-$script:UndoHome = if ($env:DSH_UNDO_SETTINGS) { Split-Path $env:DSH_UNDO_SETTINGS -Parent } else { Join-Path $env:USERPROFILE '.dsh\undo' }
+$script:UndoHome = if ($env:DSH_UNDO_SETTINGS) { Split-Path $env:DSH_UNDO_SETTINGS -Parent } else { Join-Path $script:DshHome 'undo' }
 $script:UndoSettingsFile = if ($env:DSH_UNDO_SETTINGS) { $env:DSH_UNDO_SETTINGS } else { Join-Path $script:UndoHome 'settings.json' }
-$script:UndoHomeRoot = Join-Path $env:USERPROFILE '.dsh'
+$script:UndoHomeRoot = $script:DshHome
 # v0.3.3 (issue #3): multi-profile support. The offline tools cannot see the
 # CLI argv, so the profile name comes from $env:DSH_UNDO_PROFILE or the
 # settings file (profileName), defaulting to 'web'.

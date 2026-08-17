@@ -2,6 +2,19 @@
 
 dsh-undo-savepoint 的重要变更。日期为本地时间(UTC+8)。English version: [CHANGELOG.en.md](CHANGELOG.en.md)
 
+## [0.3.5] - 2026-08-17
+
+### 修复
+- **支持 `DSH_HOME` 环境变量**（issue #6）：家目录解析优先读 `DSH_HOME`，无则回退 `~/.dsh`，与 DSH 官方启动器一致。此前所有 `.dsh` 相对路径（设置文件、快照根、profile 目录）都硬编码 `~/.dsh`，使用第三方客户端（家目录非默认）时设置丢失、自定义快照目录重启后回退默认
+  - `lib/index.js`：新增 `DSH_HOME_DIR` 常量（`DSH_HOME` ?? `join(HOME, '.dsh')`），`LEGACY_ROOT` / `SETTINGS_FILE` / `rootDir()` / `profileDir` 全部基于它
+  - `tools/dsh-undo-savepoint-lib.ps1`：同步对齐，`$script:DshHome` 优先 `$env:DSH_HOME`
+  - `DSH_UNDO_ROOT` / `DSH_UNDO_SETTINGS` 显式覆盖优先级不变
+  - `node_modules` 发现路径保持 `HOME`（用户级，不在 `.dsh` 下）
+
+### 测试
+- smoke 106/106、e2e 10/10 全通过（无回归）
+- 新增 DSH_HOME 验证：设 `DSH_HOME=/tmp/fake` 后快照和设置均写入该路径，`~/.dsh` 无残留；不设时回退行为不变
+
 ## [0.3.4] - 2026-08-16
 
 ### 新增
