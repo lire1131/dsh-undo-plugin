@@ -294,11 +294,12 @@ function Set-UndoSafeMode([bool]$On) {
     if ($On) {
         if ($st.active) { return @{ ok = $true; active = $true; message = "Safe mode is already ON (entered $($st.enteredAt))." } }
         $snap = New-UndoSnapshot 'manual' 'safe-mode-before'
+        New-Item -ItemType Directory -Force -Path $settings.autoDir | Out-Null
         $backup = Join-Path $settings.autoDir "safe-mode-backup-$($snap.id).yml"
         if (Test-Path -LiteralPath $patch) { Copy-Item -LiteralPath $patch -Destination $backup -Force }
+        else { [System.IO.File]::WriteAllText($backup, "# (no cordis.patch.yml existed when safe mode was entered)`n[]`n", (New-Object System.Text.UTF8Encoding($false))) }
         $minimal = "# dsh-undo-savepoint SAFE MODE (entered $(Get-Date -Format o))`n# All user plugins except dsh-undo-savepoint are temporarily disabled.`n- insert:`n    - id: dsh-undo-savepoint`n      name: dsh-undo-savepoint`n"
         [System.IO.File]::WriteAllText($patch, $minimal, (New-Object System.Text.UTF8Encoding($false)))
-        New-Item -ItemType Directory -Force -Path $settings.autoDir | Out-Null
         $stJson = @{ active = $true; enteredAt = (Get-Date).ToUniversalTime().ToString('o'); backup = $backup; snapshotId = $snap.id } | ConvertTo-Json -Depth 5
         [System.IO.File]::WriteAllText($stateFile, $stJson, (New-Object System.Text.UTF8Encoding($false)))
         return @{ ok = $true; active = $true; snapshotId = $snap.id; message = "Safe mode ON (pre-snapshot $($snap.id)). Restart DSH to boot with only dsh-undo-savepoint." }

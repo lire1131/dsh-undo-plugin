@@ -20,9 +20,11 @@ function Find-UndoToolsDir {
     if (Test-Path -LiteralPath $self) { return $PSScriptRoot }
 
     # 2) 搜索常见安装位置（只查固定候选路径，避免递归扫整个 node_modules 树）
+    #    issue #6:优先 $DSH_HOME（自定义家目录客户端），否则 %USERPROFILE%\.dsh
+    $dshHome = if ($env:DSH_HOME) { $env:DSH_HOME } else { Join-Path $env:USERPROFILE '.dsh' }
     $candidates = @(
-        (Join-Path $env:USERPROFILE '.dsh\profiles\web\node_modules\dsh-undo-savepoint'),
-        (Join-Path $env:USERPROFILE '.dsh\profiles\node_modules\dsh-undo-savepoint'),
+        (Join-Path $dshHome 'profiles\web\node_modules\dsh-undo-savepoint'),
+        (Join-Path $dshHome 'profiles\node_modules\dsh-undo-savepoint'),
         (Join-Path $env:USERPROFILE 'node_modules\dsh-undo-savepoint')
     )
     foreach ($c in $candidates) {

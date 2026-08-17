@@ -2,6 +2,24 @@
 
 Notable changes to dsh-undo-savepoint. Dates are in local time (UTC+8). 中文版:[CHANGELOG.md](CHANGELOG.md)
 
+## [0.3.5] - 2026-08-17
+
+### Fixed
+- **`DSH_HOME` support** (issue #6): home resolution now prefers the `DSH_HOME` env var and falls back to `~/.dsh`, matching the official DSH launcher. Previously every `.dsh`-relative path (settings file, snapshot root, profile dir) was hardcoded to `~/.dsh`, so third-party clients with a non-default home lost settings and custom snapshot dirs reverted after restart
+  - `lib/index.js`: new `DSH_HOME_DIR` constant (`DSH_HOME` ?? `join(HOME, '.dsh')`) used by `LEGACY_ROOT` / `SETTINGS_FILE` / `rootDir()` / `profileDir`
+  - `tools/dsh-undo-savepoint-lib.ps1`: aligned, `$script:DshHome` prefers `$env:DSH_HOME`
+  - `tools/make-desktop-shortcut.ps1`: shortcut candidates honor `$DSH_HOME` (custom-home clients can still auto-locate the plugin)
+  - `DSH_UNDO_ROOT` / `DSH_UNDO_SETTINGS` explicit overrides keep their precedence
+  - `node_modules` discovery stays on `HOME` (user-level, not inside `.dsh`)
+
+### Improved
+- **README preview images now load via the jsDelivr CDN** (`cdn.jsdelivr.net/gh/lire1131/dsh-undo-plugin@master/docs/*.png`): `raw.githubusercontent.com` is frequently blocked on mainland-China networks, which broke the repo-page images; the CDN loads reliably. Images are cached (~12h); force-refresh via `https://purge.jsdelivr.net/gh/lire1131/dsh-undo-plugin@master/`
+
+### Tests
+- smoke 106/106, e2e 10/10 (no regressions)
+- Manual DSH_HOME validation: with `DSH_HOME=/tmp/fake`, snapshots and settings are written under that path with no `~/.dsh` residue; unset keeps the old fallback
+- New automated regression `tools/home-resolution-test.mjs` (both branches: `DSH_HOME` honored / default `~/.dsh` fallback; asserts snapshot capture sources and settings-file location), wired into `npm test` and CI
+
 ## [0.3.4] - 2026-08-16
 
 ### Added

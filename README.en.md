@@ -10,21 +10,21 @@ An undo/rollback system for [DeepSeek Harness (DSH)](https://github.com/deepseek
 
 ## Preview
 
-| v0.3.4 conversation header: iconized Undo / Redo / Snapshots buttons + auto-snapshot status badge (click the badge to open the panel) |
+| v0.3.5 conversation header: iconized Undo / Redo / Snapshots buttons + auto-snapshot status badge (click the badge to open the panel) |
 |---|
-| ![header](docs/webui-header.png) |
+| ![header](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-plugin@master/docs/webui-header.png) |
 
 | WebUI snapshot manager (diff / restore / delete / clean-up / export / import / SAFE MODE) | WebUI Settings — own "Snapshots" section (sensitive mode / plugin whitelist / dir pickers) |
 |---|---|
-| ![panel](docs/webui-panel.png) | ![settings](docs/webui-settings-section.png) |
+| ![panel](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-plugin@master/docs/webui-panel.png) | ![settings](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-plugin@master/docs/webui-settings-section.png) |
 
 | Offline GUI (two-row toolbar + SAFE MODE button; works when DSH is down) | Offline settings dialog (sensitive mode / Browse dirs) |
 |---|---|
-| ![gui](docs/gui-main.png) | ![guisettings](docs/gui-settings.png) |
+| ![gui](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-plugin@master/docs/gui-main.png) | ![guisettings](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-plugin@master/docs/gui-settings.png) |
 
 | SAFE MODE confirmation (enter / exit) | SAFE MODE status notice |
 |---|---|
-| ![confirm](docs/safe-mode-confirm.png) | ![done](docs/safe-mode-done.png) |
+| ![confirm](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-plugin@master/docs/safe-mode-confirm.png) | ![done](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-plugin@master/docs/safe-mode-done.png) |
 
 ## Features
 
@@ -53,7 +53,7 @@ An undo/rollback system for [DeepSeek Harness (DSH)](https://github.com/deepseek
 
 ## What is snapshotted & where
 
-The snapshot captures DSH's 6 config files: `cordis.patch.yml`, `package.json`, `cordis.yml`, `pnpm-workspace.yaml` (under the profile) + `settings.yaml`, `.env` (under `~/.dsh`).
+The snapshot captures DSH's 6 config files: `cordis.patch.yml`, `package.json`, `cordis.yml`, `pnpm-workspace.yaml` (under the profile) + `settings.yaml`, `.env` (under `$DSH_HOME`, default `~/.dsh`).
 
 | Store | Default path (configurable in settings) | Contents |
 |---|---|---|
@@ -67,13 +67,19 @@ The snapshot captures DSH's 6 config files: `cordis.patch.yml`, `package.json`, 
 
 The plugin detects the active DSH profile from the launch arguments (`dsh --profile mine` / `--profile=mine`; `dsh web` falls back to `web`) and works per profile:
 
-- **Config directory**: defaults to `~/.dsh/profiles/<current profile>` (previously hardcoded to `web` — under any other profile snapshots read the wrong files, the watcher missed changes, and restores wrote to the wrong place);
+- **Config directory**: defaults to `$DSH_HOME/profiles/<current profile>` (DSH_HOME defaults to `~/.dsh`; previously hardcoded to `web` — under any other profile snapshots read the wrong files, the watcher missed changes, and restores wrote to the wrong place);
 - **Snapshot stores**: default to `<snapshot root>/<current profile>/{auto,manual}` (per-profile isolation); if the scoped dir does not exist but the old flat store does, the flat store is used so legacy snapshots are never hidden;
 - **Provenance**: the manifest records a `profile` field and `undo_list` shows the current profile.
 
 Offline CLI/GUI cannot see the launch arguments — set the `DSH_UNDO_PROFILE` environment variable or `profileName` in settings (default `web`).
 
 Explicit configuration always wins: `profileDir` / `manualDir` / `autoDir` / `profileName` (config or settings).
+
+## Custom DSH home support (v0.3.5, issue #6)
+
+The DSH data-home resolution matches the official launcher (`@deepseek-ai/dsh-home-paths`) exactly: **`$DSH_HOME` wins** (blank = unset; `~` / `~/` / `~\` prefixes supported), otherwise it falls back to `<user home>\.dsh`. The settings file (`$DSH_HOME\undo\settings.json`), default snapshot root (`$DSH_HOME\undo-snapshots`), profile dir (`$DSH_HOME\profiles\<profile>`), home root and plugin-discovery paths are all derived from it — third-party clients with a custom `DSH_HOME` no longer suffer the "two homes" split (settings written to `~/.dsh` while DSH actually uses `$DSH_HOME`), and custom directories survive restarts.
+
+Explicit overrides are preserved: `DSH_UNDO_SETTINGS` / `DSH_UNDO_ROOT` / `DSH_UNDO_EXPORT` (env vars) and the config keys `homeDir` / `profileDir` / `manualDir` / `autoDir` keep the highest precedence.
 
 ## Installation
 
@@ -121,7 +127,7 @@ The external undo tools (GUI window + CLI) are **not placed on the desktop** —
 
 | Install method | Tool location |
 |---|---|
-| Method A: `dsh plugin add` | `C:\Users\<your-username>\.dsh\profiles\web\node_modules\dsh-undo-savepoint\tools\` |
+| Method A: `dsh plugin add` | `$DSH_HOME\profiles\web\node_modules\dsh-undo-savepoint\tools\` (DSH_HOME defaults to `%USERPROFILE%\.dsh`) |
 | Method B: clone + junction | your clone `...\dsh-undo-savepoint\tools\` |
 
 > ⚠️ The install command references the repo name `dsh-undo-plugin`, but the installed folder is named after the **package name `dsh-undo-savepoint`** — searching by "repo name" will not find it.
@@ -132,7 +138,8 @@ Double-click `tools\make-desktop-shortcut.bat` (it auto-locates the plugin direc
 or copy the whole block below into a PowerShell window and press Enter (no need to locate any file first):
 
 ```powershell
-$d = @("$env:USERPROFILE\.dsh\profiles\web\node_modules\dsh-undo-savepoint", "$env:USERPROFILE\.dsh\profiles\node_modules\dsh-undo-savepoint", "$env:USERPROFILE\node_modules\dsh-undo-savepoint") | Where-Object { Test-Path (Join-Path $_ 'tools\dsh-undo-savepoint-gui.bat') } | Select-Object -First 1
+$dshHome = if ($env:DSH_HOME) { $env:DSH_HOME } else { "$env:USERPROFILE\.dsh" }
+$d = @("$dshHome\profiles\web\node_modules\dsh-undo-savepoint", "$dshHome\profiles\node_modules\dsh-undo-savepoint", "$env:USERPROFILE\node_modules\dsh-undo-savepoint") | Where-Object { Test-Path (Join-Path $_ 'tools\dsh-undo-savepoint-gui.bat') } | Select-Object -First 1
 if ($d) {
   $w = New-Object -ComObject WScript.Shell
   $s = $w.CreateShortcut((Join-Path ([Environment]::GetFolderPath('Desktop')) 'DSH Undo Manager.lnk'))
@@ -146,7 +153,8 @@ if ($d) {
 **Just want to open the tools folder:**
 
 ```powershell
-explorer "$env:USERPROFILE\.dsh\profiles\web\node_modules\dsh-undo-savepoint\tools"
+$dshHome = if ($env:DSH_HOME) { $env:DSH_HOME } else { "$env:USERPROFILE\.dsh" }
+explorer "$dshHome\profiles\web\node_modules\dsh-undo-savepoint\tools"
 ```
 
 After that, double-click the desktop **DSH Undo Manager** icon to open the external tools (they work even when DSH itself fails to boot).

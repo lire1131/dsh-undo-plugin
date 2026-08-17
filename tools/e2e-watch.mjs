@@ -5,7 +5,6 @@
 //   3. redo then succeeds (would have been blocked before the fix)
 // Run:  node tools/e2e-watch.mjs
 process.env.DSH_ROOT = process.env.DSH_ROOT ?? 'C:/Users/yzf';
-const { apply } = await import('../lib/index.js');
 import { mkdtemp, writeFile, readFile, mkdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -23,6 +22,13 @@ await mkdir(join(pluginDir, 'lib'), { recursive: true });
 await writeFile(join(home, 'settings.yaml'), 'model: x\n');
 await writeFile(join(profile, 'cordis.patch.yml'), '# patch\n[]\n');
 await writeFile(join(pluginDir, 'lib', 'index.js'), 'export const a = 1;\n');
+
+// ★ 2026-08-18 隔离修复（与 smoke-test.mjs 相同）：lib/index.js 在模块加载时
+//   按 env 求值 SETTINGS_FILE / LEGACY_ROOT，默认落到 $DSH_HOME/undo*（真实
+//   home）。必须在 import 之前把这两个 env 指向测试目录，防止测试写脏真实 home。
+process.env.DSH_UNDO_SETTINGS = join(root, 'undo', 'settings.json');
+process.env.DSH_UNDO_ROOT = join(root, 'undo-snapshots');
+const { apply } = await import('../lib/index.js');
 
 const tools = new Map();
 const ctx = {

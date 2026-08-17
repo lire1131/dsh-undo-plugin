@@ -1,7 +1,6 @@
 // tools/smoke-test.mjs — offline smoke test of dsh-undo-savepoint logic (no DSH needed).
 // Run:  node tools/smoke-test.mjs
 process.env.DSH_ROOT = process.env.DSH_ROOT ?? 'C:/Users/yzf';
-const { apply } = await import('../lib/index.js');
 import { mkdtemp, writeFile, readFile, mkdir, rm, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -15,6 +14,14 @@ await mkdir(profile, { recursive: true });
 await writeFile(join(home, 'settings.yaml'), 'model: v1\n');
 await writeFile(join(profile, 'cordis.patch.yml'), '# patch\n[]\n');
 await writeFile(join(profile, 'package.json'), '{"name":"test","v":1}\n');
+
+// ★ 2026-08-18 隔离修复：lib/index.js 在模块加载时按 env 求值 SETTINGS_FILE /
+//   LEGACY_ROOT，默认落到 $DSH_HOME/undo*（真实 home）。必须在 import 之前把
+//   这两个 env 指向测试目录，否则测试产生的 undo/redo 记录会写脏真实 home 的
+//   undo/rollback-log.jsonl（此前已实测污染）。
+process.env.DSH_UNDO_SETTINGS = join(root, 'undo', 'settings.json');
+process.env.DSH_UNDO_ROOT = join(root, 'undo-snapshots');
+const { apply } = await import('../lib/index.js');
 
 const tools = new Map();
 const ctx = {

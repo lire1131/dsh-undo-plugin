@@ -8,12 +8,17 @@ dsh-undo-savepoint 的重要变更。日期为本地时间(UTC+8)。English vers
 - **支持 `DSH_HOME` 环境变量**（issue #6）：家目录解析优先读 `DSH_HOME`，无则回退 `~/.dsh`，与 DSH 官方启动器一致。此前所有 `.dsh` 相对路径（设置文件、快照根、profile 目录）都硬编码 `~/.dsh`，使用第三方客户端（家目录非默认）时设置丢失、自定义快照目录重启后回退默认
   - `lib/index.js`：新增 `DSH_HOME_DIR` 常量（`DSH_HOME` ?? `join(HOME, '.dsh')`），`LEGACY_ROOT` / `SETTINGS_FILE` / `rootDir()` / `profileDir` 全部基于它
   - `tools/dsh-undo-savepoint-lib.ps1`：同步对齐，`$script:DshHome` 优先 `$env:DSH_HOME`
+  - `tools/make-desktop-shortcut.ps1`：桌面快捷方式候选路径支持 `$DSH_HOME`（自定义家目录客户端也能自动定位插件目录）
   - `DSH_UNDO_ROOT` / `DSH_UNDO_SETTINGS` 显式覆盖优先级不变
   - `node_modules` 发现路径保持 `HOME`（用户级，不在 `.dsh` 下）
+
+### 优化
+- **README 预览图改走 jsDelivr CDN**（`cdn.jsdelivr.net/gh/lire1131/dsh-undo-plugin@master/docs/*.png`）：`raw.githubusercontent.com` 在国内网络常被阻断，此前仓库页 README 图片经常加载不出来；CDN 直连可稳定加载。图片有缓存（约 12h），需强制刷新时访问 `https://purge.jsdelivr.net/gh/lire1131/dsh-undo-plugin@master/` 清缓存
 
 ### 测试
 - smoke 106/106、e2e 10/10 全通过（无回归）
 - 新增 DSH_HOME 验证：设 `DSH_HOME=/tmp/fake` 后快照和设置均写入该路径，`~/.dsh` 无残留；不设时回退行为不变
+- 新增自动化回归 `tools/home-resolution-test.mjs`（双分支：`DSH_HOME` 优先 / 默认回退 `~/.dsh`，验证快照捕获来源与设置文件落点），已接入 `npm test` 与 CI
 
 ## [0.3.4] - 2026-08-16
 

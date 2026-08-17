@@ -12,21 +12,21 @@
 
 ## 预览
 
-| v0.3.4 会话头部:撤销/恢复/快照按钮全部图标化 + 自动快照状态徽章(点击徽章打开快照面板) |
+| v0.3.5 会话头部:撤销/恢复/快照按钮全部图标化 + 自动快照状态徽章(点击徽章打开快照面板) |
 |---|
-| ![header](docs/webui-header.png) |
+| ![header](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-plugin@master/docs/webui-header.png) |
 
 | WebUI 快照管理面板(差异/回退/删除/清理/导出/导入/安全模式) | WebUI 设置「快照」独立栏目(敏感模式/插件白名单/目录选择) |
 |---|---|
-| ![panel](docs/webui-panel.png) | ![settings](docs/webui-settings-section.png) |
+| ![panel](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-plugin@master/docs/webui-panel.png) | ![settings](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-plugin@master/docs/webui-settings-section.png) |
 
 | 局外程序窗口(两行工具栏 + 安全模式按钮,DSH 挂了也能用) | 局外设置对话框(敏感模式/浏览选目录) |
 |---|---|
-| ![gui](docs/gui-main.png) | ![guisettings](docs/gui-settings.png) |
+| ![gui](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-plugin@master/docs/gui-main.png) | ![guisettings](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-plugin@master/docs/gui-settings.png) |
 
 | 安全模式确认(进入/退出) | 安全模式状态提示 |
 |---|---|
-| ![confirm](docs/safe-mode-confirm.png) | ![done](docs/safe-mode-done.png) |
+| ![confirm](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-plugin@master/docs/safe-mode-confirm.png) | ![done](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-plugin@master/docs/safe-mode-done.png) |
 
 ## 功能一览
 
@@ -55,7 +55,7 @@
 
 ## 快照内容与存储
 
-快照对象是 DSH 的 6 个配置文件:`cordis.patch.yml`、`package.json`、`cordis.yml`、`pnpm-workspace.yaml`(profile 下)+ `settings.yaml`、`.env`(~/.dsh 下)。
+快照对象是 DSH 的 6 个配置文件:`cordis.patch.yml`、`package.json`、`cordis.yml`、`pnpm-workspace.yaml`(profile 下)+ `settings.yaml`、`.env`($DSH_HOME 下,默认 ~/.dsh)。
 
 | 库 | 默认路径(可在设置中修改) | 内容 |
 |---|---|---|
@@ -69,13 +69,19 @@
 
 插件从启动参数自动识别当前 profile(`dsh --profile mine` / `--profile=mine`;`dsh web` 回退为 `web`),并按当前 profile 工作:
 
-- **配置目录**:默认 `~/.dsh/profiles/<当前 profile>`(此前硬编码 `web`——非 web profile 下快照读错、监听错、恢复写错位置);
+- **配置目录**:默认 `$DSH_HOME/profiles/<当前 profile>`(DSH_HOME 默认 ~/.dsh;此前硬编码 `web`——非 web profile 下快照读错、监听错、恢复写错位置);
 - **快照仓库**:默认 `<快照根>/<当前 profile>/{auto,manual}`(按 profile 隔离);作用域目录不存在而旧版平铺目录存在时自动回退平铺,旧快照不会"隐身";
 - **归属标识**:快照 manifest 记录 `profile` 字段,`undo_list` 显示当前 profile。
 
 离线 CLI/GUI 看不到启动参数,通过环境变量 `DSH_UNDO_PROFILE` 或 settings 里的 `profileName` 指定(默认 `web`)。
 
 显式配置优先级不变:`profileDir` / `manualDir` / `autoDir` / `profileName`(config 或 settings)始终生效。
+
+## 自定义家目录支持(v0.3.5,issue #6)
+
+DSH 数据家目录的解析与官方启动器(`@deepseek-ai/dsh-home-paths`)完全一致:**`DSH_HOME` 环境变量优先**(空白视为未设置,支持 `~` / `~/` / `~\` 前缀),否则回退 `<用户家目录>\.dsh`。设置文件(`$DSH_HOME\undo\settings.json`)、默认快照根(`$DSH_HOME\undo-snapshots`)、profile 目录(`$DSH_HOME\profiles\<profile>`)、home 根、插件发现路径全部基于它——第三方客户端(自定义 `DSH_HOME`)不再出现"设置写到 `~/.dsh`、DSH 实际用 `$DSH_HOME`"的两套家分裂,重启后自定义目录稳定保留。
+
+显式覆盖仍然保留:`DSH_UNDO_SETTINGS` / `DSH_UNDO_ROOT` / `DSH_UNDO_EXPORT`(环境变量)与 config 里的 `homeDir` / `profileDir` / `manualDir` / `autoDir` 优先级最高。
 
 ## 安装
 
@@ -123,7 +129,7 @@ mklink /J "<你的DSH安装>\node_modules\dsh-undo-savepoint" "D:\dsh\plugins\ds
 
 | 安装方式 | 工具位置 |
 |---|---|
-| 方式 A:`dsh plugin add` | `C:\Users\<你的用户名>\.dsh\profiles\web\node_modules\dsh-undo-savepoint\tools\` |
+| 方式 A:`dsh plugin add` | `$DSH_HOME\profiles\web\node_modules\dsh-undo-savepoint\tools\`(DSH_HOME 默认 %USERPROFILE%\.dsh) |
 | 方式 B:clone + junction | 你 clone 的目录 `...\dsh-undo-savepoint\tools\` |
 
 > ⚠️ 注意:安装命令里的仓库名是 `dsh-undo-plugin`,但装好后目录名是**包名 `dsh-undo-savepoint`**——按"仓库名"去找目录是找不到的。
@@ -134,7 +140,8 @@ mklink /J "<你的DSH安装>\node_modules\dsh-undo-savepoint" "D:\dsh\plugins\ds
 或者把下面整段复制到 PowerShell 窗口回车(无需先找文件,自动定位):
 
 ```powershell
-$d = @("$env:USERPROFILE\.dsh\profiles\web\node_modules\dsh-undo-savepoint", "$env:USERPROFILE\.dsh\profiles\node_modules\dsh-undo-savepoint", "$env:USERPROFILE\node_modules\dsh-undo-savepoint") | Where-Object { Test-Path (Join-Path $_ 'tools\dsh-undo-savepoint-gui.bat') } | Select-Object -First 1
+$dshHome = if ($env:DSH_HOME) { $env:DSH_HOME } else { "$env:USERPROFILE\.dsh" }
+$d = @("$dshHome\profiles\web\node_modules\dsh-undo-savepoint", "$dshHome\profiles\node_modules\dsh-undo-savepoint", "$env:USERPROFILE\node_modules\dsh-undo-savepoint") | Where-Object { Test-Path (Join-Path $_ 'tools\dsh-undo-savepoint-gui.bat') } | Select-Object -First 1
 if ($d) {
   $w = New-Object -ComObject WScript.Shell
   $s = $w.CreateShortcut((Join-Path ([Environment]::GetFolderPath('Desktop')) 'DSH撤销管理器.lnk'))
@@ -148,7 +155,8 @@ if ($d) {
 **只想打开工具目录看一眼:**
 
 ```powershell
-explorer "$env:USERPROFILE\.dsh\profiles\web\node_modules\dsh-undo-savepoint\tools"
+$dshHome = if ($env:DSH_HOME) { $env:DSH_HOME } else { "$env:USERPROFILE\.dsh" }
+explorer "$dshHome\profiles\web\node_modules\dsh-undo-savepoint\tools"
 ```
 
 之后双击桌面「DSH撤销管理器」即可打开局外工具(DSH 崩溃、启动不了时也能用)。
