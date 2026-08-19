@@ -92,13 +92,25 @@ So the repository is easier to find on GitHub search & Explore, these topics are
 
 Prerequisites: DSH (`@deepseek-ai/dsh`) and Node.js (≥20).
 
-**Option A (recommended, ecosystem standard)** — this plugin declares a `dsh.bundle` manifest, so install it with the official plugin command:
+**Option A (recommended, npm registry)** — the plugin is published to the npm registry as `dsh-undo-savepoint` and declares a `dsh.bundle` manifest, so a single command installs it:
+
+```bat
+dsh plugin --profile web add dsh-undo-savepoint
+```
+
+Restart DSH after installing. Snapshot directories and options are configurable in Settings.
+
+For manual mounting, you can also `npm install dsh-undo-savepoint` from your DSH install root (peer dependencies are provided by DSH, nothing extra to install):
+
+```bat
+npm install dsh-undo-savepoint
+```
+
+**Option A2 (GitHub direct)** — install the latest master commit without waiting for an npm sync:
 
 ```bat
 dsh plugin --profile web add github:lire1131/dsh-undo-savepoint#master
 ```
-
-Restart DSH after installing. Snapshot directories and options are configurable in Settings.
 
 **Option B (local source / pre-release)** — clone and mount manually:
 

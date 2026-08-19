@@ -94,13 +94,25 @@ DSH 数据家目录的解析与官方启动器(`@deepseek-ai/dsh-home-paths`)完
 
 前置:已安装 DSH(`@deepseek-ai/dsh`)与 Node.js(≥20)。
 
-**方式 A(推荐,生态标准一条命令)** — 本插件已声明 `dsh.bundle` manifest,可直接用官方插件命令安装:
+**方式 A(推荐,npm 发布版)** — 本插件已发布到 npm registry(`dsh-undo-savepoint`)并声明 `dsh.bundle` manifest,一条命令安装:
+
+```bat
+dsh plugin --profile web add dsh-undo-savepoint
+```
+
+安装完成后重启 DSH 即生效(快照目录、参数等均可在设置中修改)。
+
+需要手动挂载时,也可在 DSH 安装根目录直接用 npm 安装(peer 依赖由 DSH 提供,无需额外安装):
+
+```bat
+npm install dsh-undo-savepoint
+```
+
+**方式 A2(GitHub 直装)** — 想装 master 最新提交、不等 npm 同步时:
 
 ```bat
 dsh plugin --profile web add github:lire1131/dsh-undo-savepoint#master
 ```
-
-安装完成后重启 DSH 即生效(快照目录、参数等均可在设置中修改)。
 
 **方式 B(本地源码/免发布)** — clone 到本地目录并手工挂载:
 
