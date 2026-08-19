@@ -718,7 +718,9 @@ const cfgNames = m18.files.map((f) => f.name).filter((n) => !n.startsWith('plugi
 check(cfgNames.every((n) => expectedDest.has(n)), 'snapshot config names all come from lib/spec.json (no extras)');
 const existing18 = ['profile-cordis.patch.yml', 'profile-package.json', 'profile-pnpm-workspace.yaml', 'profile-pnpm-lock.yaml', 'home-settings.yaml', 'home-cordis.patch.yml'];
 check(existing18.every((n) => cfgNames.includes(n)), 'every existing spec file is snapshotted');
-// fake pnpm on PATH: verify the explicit sync path and its command line
+// fake pnpm on PATH: verify the explicit sync path and its command line.
+// 纯 Windows 设计：插件经 cmd.exe /d /s /c pnpm ... 调用，cmd 按 PATH 解析
+// pnpm.cmd（与真实部署一致）；CI 在 windows-latest 上运行。
 const bin18 = join(root18, 'bin');
 await mkdir(bin18, { recursive: true });
 const marker18 = join(root18, 'pnpm-calls.txt');
@@ -730,8 +732,17 @@ await writeFile(join(profile18, 'package.json'), '{"name":"test","v":3}\n');
 await run18('undo_snapshot', { reason: 'lock-v3' });
 out = await run18('undo_restore', { mode: 'undo', sync_deps: true });
 process.env.PATH = oldPath18;
-check(out.includes('Dependencies synced'), 'sync_deps reports successful pnpm run');
-check((await readFile(marker18, 'utf8')).includes('install --frozen-lockfile'), 'sync ran pnpm install --frozen-lockfile');
+// 先看结果里有没有成功标记；失败时把输出尾部打出来，避免真实原因被后续
+// ENOENT 异常掩盖（CI 上曾因此只看到 readFile 堆栈而看不到断言失败本身）。
+const syncedOk = out.includes('Dependencies synced');
+if (!syncedOk) {
+  console.error('   !! sync_deps 未报告成功，restore 输出尾部：');
+  console.error(out.split('\n').slice(-8).map((l) => '   | ' + l).join('\n'));
+}
+check(syncedOk, 'sync_deps reports successful pnpm run');
+let calls18 = '';
+try { calls18 = await readFile(marker18, 'utf8'); } catch { /* marker 未生成 -> 保持空串，走下方明确断言 */ }
+check(calls18.includes('install --frozen-lockfile'), 'sync ran pnpm install --frozen-lockfile');
 await rm(root18, { recursive: true, force: true });
 
 await rm(root, { recursive: true, force: true });

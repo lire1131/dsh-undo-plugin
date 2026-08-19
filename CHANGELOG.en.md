@@ -7,6 +7,7 @@ Notable changes to dsh-undo-savepoint. Dates are in local time (UTC+8). 中文�
 ### Fixed
 - **Boot-critical snapshot coverage**: profile-level `pnpm-lock.yaml` and home-level `cordis.patch.yml` are now snapshotted, matching the state `dsh plugin add/update/remove` actually mutates (issue #8)
 - **Dependency reconciliation after restore**: when undo/redo/restore touches `package.json` / `pnpm-lock.yaml` / `pnpm-workspace.yaml`, the default result reports that `node_modules` may be out of sync and prints the rebuild command. An explicit sync runs `pnpm install --frozen-lockfile` (plain `pnpm install` without a lockfile); a failed install never rolls back the restored config files
+- **Watcher fault tolerance (surfaced by the node 20 CI job)**: `fs.watch` now attaches an `error` handler. When a watched directory is deleted or renamed (test temp-dir cleanup, real-world plugin uninstall/rename), the Windows FSWatcher asynchronously throws `EPERM`; previously it crashed the whole process as an unhandled exception. Now the watcher is closed and logged instead
 
 ### Improved
 - **npm install removed from docs**: README no longer advertises the npm-registry install; install options are now GitHub direct (way A) and local source (way B)
@@ -16,9 +17,15 @@ Notable changes to dsh-undo-savepoint. Dates are in local time (UTC+8). 中文�
 - Model tool: `undo_restore` gains an optional `sync_deps` boolean
 - REST: `/api/undo/undo|redo|restore` accept optional `syncDeps`
 
+### CI (Windows-only, no cross-platform)
+- **CI moved to windows-latest**: the plugin is Windows-only (`runPnpm` goes through `cmd.exe`, tests use a `.cmd` fake pnpm, bundled `.ps1/.bat` tools). CI previously ran on ubuntu-latest, where section 24's fake-pnpm test always failed (`pnpm.cmd` never runs on Linux; the missing marker then threw an uncaught ENOENT). CI now matches the real deployment environment
+- **fail-fast: false**: the node 20 / 22 matrix jobs each finish and report independently instead of cancelling each other
+- **home-resolution-test.mjs now runs in CI**: aligns CI with the 4-script `npm test` suite (the issue #6 DSH_HOME regression was previously skipped)
+- **smoke-test §24 diagnostics hardened**: a sync_deps failure prints the restore output tail, and a missing marker yields a clear assertion instead of an uncaught ENOENT masking the real failure
+
 ### Tests
 - smoke 106 → 114 (lockfile/home-patch snapshots, byte-level restore, default report-only, explicit sync command verification, spec.json consistency assertion)
-- e2e 10/10, no regressions
+- e2e 10/10, no regressions; CI green on windows-latest × node[20,22]
 
 ## [0.3.5] - 2026-08-17
 

@@ -7,6 +7,7 @@ dsh-undo-savepoint 的重要变更。日期为本地时间(UTC+8)。English vers
 ### 修复
 - **快照补齐启动关键文件**：新增 profile 级 `pnpm-lock.yaml` 与 home 级 `cordis.patch.yml`，与 `dsh plugin add/update/remove` 实际改动的状态对齐（issue #8）
 - **恢复后对账依赖状态**：undo/redo/restore 触及 `package.json` / `pnpm-lock.yaml` / `pnpm-workspace.yaml` 时，默认报告 `node_modules` 可能不同步并给出重建命令；显式开启同步时执行 `pnpm install --frozen-lockfile`（无 lockfile 回退普通 `pnpm install`），安装失败不回滚已还原的配置文件
+- **watcher 容错（node 20 CI 暴露）**：`fs.watch` 补挂 error 处理器——被监听目录被删除/重命名时（测试清理临时目录、真实使用中卸载插件/改目录名），Windows 下 FSWatcher 异步抛 `EPERM`，此前无处理会以未捕获异常炸掉整个进程；现自动关闭该监听并告警，不再崩溃
 
 ### 优化
 - **移除 npm 安装方式**：README 删除 npm 发布版安装说明与 npm 安装地址，安装方式收敛为 GitHub 直装（方式 A）与本地源码（方式 B）
@@ -16,9 +17,15 @@ dsh-undo-savepoint 的重要变更。日期为本地时间(UTC+8)。English vers
 - 模型工具：`undo_restore` 新增 `sync_deps` 布尔参数
 - REST：`/api/undo/undo|redo|restore` 接受可选 `syncDeps`
 
+### CI（纯 Windows，不跨平台）
+- **CI 迁移 windows-latest**：本项目为纯 Windows 插件（`runPnpm` 走 `cmd.exe`、测试用 `.cmd` 假 pnpm、附带 `.ps1/.bat` 工具），此前 CI 误跑 ubuntu-latest，第 24 节"假 pnpm"测试必然失败（`pnpm.cmd` 在 Linux 上不生效，marker 未生成导致 ENOENT 抛崩）——现已与真实部署环境一致
+- **fail-fast: false**：node 20 / 22 矩阵各自跑完、独立报告，不再互相取消
+- **补跑 home-resolution-test.mjs**：CI 与 `npm test` 四脚本套件对齐（此前漏跑 issue #6 的 DSH_HOME 回归）
+- **smoke-test §24 诊断加固**：sync_deps 失败时打印 restore 输出尾部，marker 缺失走明确断言，不再被未捕获 ENOENT 掩盖真实失败原因
+
 ### 测试
 - smoke 106 → 114（新增 lockfile/home patch 快照、字节级还原、默认不同步、显式同步命令校验、spec.json 一致性断言）
-- e2e 10/10 无回归
+- e2e 10/10 无回归；CI 在 windows-latest × node[20,22] 全绿
 
 ## [0.3.5] - 2026-08-17
 

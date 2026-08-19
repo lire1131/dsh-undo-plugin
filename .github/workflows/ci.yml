@@ -5,10 +5,13 @@ on:
     branches: [master]
   pull_request:
 
+# 本项目为纯 Windows 平台插件（runPnpm 走 cmd.exe、测试用 .cmd 假 pnpm、
+# 附带 .ps1/.bat 工具），CI 必须在 windows-latest 上跑，与真实部署环境一致。
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     strategy:
+      fail-fast: false
       matrix:
         node-version: [20, 22]
     steps:
@@ -22,5 +25,7 @@ jobs:
         run: npm install --no-save @deepseek-ai/dsh-tools
       - name: Smoke tests
         run: node tools/smoke-test.mjs
+      - name: Home resolution regression (issue #6)
+        run: node tools/home-resolution-test.mjs
       - name: Watcher e2e regression
         run: node tools/e2e-watch.mjs
