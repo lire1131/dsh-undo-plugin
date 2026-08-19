@@ -709,6 +709,15 @@ await run18('undo_snapshot', { reason: 'lock-v2' });
 out = await run18('undo_restore', { mode: 'undo' });
 check((await readFile(join(profile18, 'pnpm-lock.yaml'), 'utf8')).includes('v: 1'), 'undo restores pnpm-lock.yaml bytes');
 check(out.includes('dependency state may be out of sync'), 'default restore reports dependency drift without running pnpm');
+// spec.json 单一事实源: 快照配置文件名全部来自 lib/spec.json,且每个已存在的 spec
+// 文件都被捕获(防 Node DEFAULT_SPEC / PS UndoFileSpecs 兜底清单与 spec.json 漂移,
+// 这正是 issue #8 的根因)。
+const spec = JSON.parse(await readFile(new URL('../lib/spec.json', import.meta.url), 'utf8'));
+const expectedDest = new Set(spec.configFiles.map((s) => `${s.root}-${s.rel}`));
+const cfgNames = m18.files.map((f) => f.name).filter((n) => !n.startsWith('plugin:') && !n.startsWith('profile:'));
+check(cfgNames.every((n) => expectedDest.has(n)), 'snapshot config names all come from lib/spec.json (no extras)');
+const existing18 = ['profile-cordis.patch.yml', 'profile-package.json', 'profile-pnpm-workspace.yaml', 'profile-pnpm-lock.yaml', 'home-settings.yaml', 'home-cordis.patch.yml'];
+check(existing18.every((n) => cfgNames.includes(n)), 'every existing spec file is snapshotted');
 // fake pnpm on PATH: verify the explicit sync path and its command line
 const bin18 = join(root18, 'bin');
 await mkdir(bin18, { recursive: true });

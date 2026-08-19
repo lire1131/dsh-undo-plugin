@@ -17,7 +17,7 @@ Notable changes to dsh-undo-savepoint. Dates are in local time (UTC+8). 中文�
 - REST: `/api/undo/undo|redo|restore` accept optional `syncDeps`
 
 ### Tests
-- smoke 106 → 112 (lockfile/home-patch snapshots, byte-level restore, default report-only, explicit sync command verification)
+- smoke 106 → 114 (lockfile/home-patch snapshots, byte-level restore, default report-only, explicit sync command verification, spec.json consistency assertion)
 - e2e 10/10, no regressions
 
 ## [0.3.5] - 2026-08-17

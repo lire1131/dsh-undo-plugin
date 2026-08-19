@@ -17,7 +17,7 @@ dsh-undo-savepoint 的重要变更。日期为本地时间(UTC+8)。English vers
 - REST：`/api/undo/undo|redo|restore` 接受可选 `syncDeps`
 
 ### 测试
-- smoke 106 → 112（新增 lockfile/home patch 快照、字节级还原、默认不同步、显式同步命令校验）
+- smoke 106 → 114（新增 lockfile/home patch 快照、字节级还原、默认不同步、显式同步命令校验、spec.json 一致性断言）
 - e2e 10/10 无回归
 
 ## [0.3.5] - 2026-08-17

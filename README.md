@@ -57,7 +57,6 @@
 ## 快照内容与存储
 
 快照对象是 DSH 的启动关键配置:`cordis.patch.yml`、`package.json`、`cordis.yml`、`pnpm-workspace.yaml`、`pnpm-lock.yaml`(profile 下)+ `cordis.patch.yml`、`settings.yaml`、`.env`、`.credentials.yaml`($DSH_HOME 下,默认 ~/.dsh)。
-
 恢复涉及 `package.json` / `pnpm-lock.yaml` 时,默认只报告 `node_modules` 可能不同步;需要真正重建依赖时加 `-SyncDeps`(离线 CLI)、`sync_deps: true`(对话工具)或 `syncDeps: true`(REST),插件会执行 `pnpm install --frozen-lockfile`(无 lockfile 时普通 `pnpm install`)。安装失败不影响已经还原的配置文件。
 
 | 库 | 默认路径(可在设置中修改) | 内容 |
@@ -244,6 +243,6 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-plugin.ps1" add <
 - 测试(不需要 DSH 运行,在仓库目录执行):
 
 ```bat
-node tools\smoke-test.mjs     :: 29 项逻辑测试(快照/撤销/重做/存储分流/无变化提示)
-node tools\e2e-watch.mjs      :: 6 项真实时序回归(自动存档/撤销不误伤/重做)
+node tools\smoke-test.mjs     :: 114 项逻辑测试(快照/撤销/重做/存储分流/无变化提示)
+node tools\e2e-watch.mjs      :: 10 项真实时序回归(自动存档/撤销不误伤/重做)
 ```

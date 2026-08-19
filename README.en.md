@@ -55,7 +55,6 @@ An undo/rollback system for [DeepSeek Harness (DSH)](https://github.com/deepseek
 ## What is snapshotted & where
 
 The snapshot captures DSH's boot-critical config: `cordis.patch.yml`, `package.json`, `cordis.yml`, `pnpm-workspace.yaml`, `pnpm-lock.yaml` (under the profile) + `cordis.patch.yml`, `settings.yaml`, `.env`, `.credentials.yaml` (under `$DSH_HOME`, default `~/.dsh`).
-
 When a restore touches `package.json` / `pnpm-lock.yaml`, the default behavior only reports that `node_modules` may be out of sync. To rebuild dependencies, pass `-SyncDeps` (offline CLI), `sync_deps: true` (chat tool), or `syncDeps: true` (REST); the plugin runs `pnpm install --frozen-lockfile` (plain `pnpm install` when there is no lockfile). A failed install leaves the restored config files in place.
 
 | Store | Default path (configurable in settings) | Contents |
@@ -242,6 +241,6 @@ Typical rescue scenario: **DSH fails to boot with something like `duplicate load
 - Tests (no DSH needed; run in the repository directory):
 
 ```bat
-node tools\smoke-test.mjs     :: 29 logic tests (snapshot/undo/redo/store split/no-change hint)
-node tools\e2e-watch.mjs      :: 6 real-timing regressions (auto-save/undo-no-harm/redo)
+node tools\smoke-test.mjs     :: 114 logic tests (snapshot/undo/redo/store split/no-change hint)
+node tools\e2e-watch.mjs      :: 10 real-timing regressions (auto-save/undo-no-harm/redo)
 ```

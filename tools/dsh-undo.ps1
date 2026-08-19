@@ -30,6 +30,15 @@ param(
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'dsh-undo-savepoint-lib.ps1')
 
+function Write-UndoDepsResult($Deps) {
+    if (-not $Deps.touched) { return }
+    if ($Deps.synced) { Write-Host "Dependencies synced: $($Deps.command)" }
+    else {
+        Write-Host "WARNING $($Deps.note)"
+        Write-Host 'Restored config files are in place; re-run with -SyncDeps to rebuild dependencies automatically.'
+    }
+}
+
 switch ($Command) {
     'snapshot' {
         $reason = if ($Label) { $Label } else { 'manual' }
@@ -46,13 +55,7 @@ switch ($Command) {
         if ($r.remounted) { Write-Host 'dsh-undo mount re-ensured in cordis.patch.yml' }
         if ($r.missing -and @($r.missing).Count -gt 0) { Write-Host "Not restored: $($r.missing -join ', ')" }
         if ($r.needsRestart) { Write-Host 'NOTE: a restart of DSH is required for the restored state to take effect.' }
-        if ($r.deps.touched) {
-            if ($r.deps.synced) { Write-Host "Dependencies synced: $($r.deps.command)" }
-            else {
-                Write-Host "WARNING $($r.deps.note)"
-                Write-Host 'Restored config files are in place; re-run with -SyncDeps to rebuild dependencies automatically.'
-            }
-        }
+        Write-UndoDepsResult $r.deps
         if ($r.preflight -and @($r.preflight.missing).Count -gt 0) {
             Write-Host "WARNING Cross-machine preflight: not resolvable on this machine: $($r.preflight.missing -join ', ')"
             Write-Host 'DSH may fail to start after restore - install them first, or run: dsh-undo.ps1 safe-mode -Label on'
@@ -66,13 +69,7 @@ switch ($Command) {
         Write-Host "Files: $($r.restored -join ', ')"
         if ($r.missing -and @($r.missing).Count -gt 0) { Write-Host "Not restored: $($r.missing -join ', ')" }
         if ($r.needsRestart) { Write-Host 'NOTE: a restart of DSH is required for the restored state to take effect.' }
-        if ($r.deps.touched) {
-            if ($r.deps.synced) { Write-Host "Dependencies synced: $($r.deps.command)" }
-            else {
-                Write-Host "WARNING $($r.deps.note)"
-                Write-Host 'Restored config files are in place; re-run with -SyncDeps to rebuild dependencies automatically.'
-            }
-        }
+        Write-UndoDepsResult $r.deps
         foreach ($n in @($r.notes)) { Write-Host "Note: $n" }
     }
     'list' {
@@ -107,13 +104,7 @@ switch ($Command) {
         if ($r.remounted) { Write-Host 'dsh-undo mount re-ensured in cordis.patch.yml' }
         if ($r.missing -and @($r.missing).Count -gt 0) { Write-Host "Not restored: $($r.missing -join ', ')" }
         if ($r.needsRestart) { Write-Host 'NOTE: a restart of DSH is required for the restored state to take effect.' }
-        if ($r.deps.touched) {
-            if ($r.deps.synced) { Write-Host "Dependencies synced: $($r.deps.command)" }
-            else {
-                Write-Host "WARNING $($r.deps.note)"
-                Write-Host 'Restored config files are in place; re-run with -SyncDeps to rebuild dependencies automatically.'
-            }
-        }
+        Write-UndoDepsResult $r.deps
         if ($r.preflight -and @($r.preflight.missing).Count -gt 0) {
             Write-Host "WARNING Cross-machine preflight: not resolvable on this machine: $($r.preflight.missing -join ', ')"
             Write-Host 'DSH may fail to start after restore - install them first, or run: dsh-undo.ps1 safe-mode -Label on'
