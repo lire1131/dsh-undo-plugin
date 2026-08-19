@@ -2,6 +2,21 @@
 
 Notable changes to dsh-undo-savepoint. Dates are in local time (UTC+8). 中文版:[CHANGELOG.md](CHANGELOG.md)
 
+## [Unreleased]
+
+### Fixed
+- **Boot-critical snapshot coverage**: profile-level `pnpm-lock.yaml` and home-level `cordis.patch.yml` are now snapshotted, matching the state `dsh plugin add/update/remove` actually mutates (issue #8)
+- **Dependency reconciliation after restore**: when undo/redo/restore touches `package.json` / `pnpm-lock.yaml` / `pnpm-workspace.yaml`, the default result reports that `node_modules` may be out of sync and prints the rebuild command. An explicit sync runs `pnpm install --frozen-lockfile` (plain `pnpm install` without a lockfile); a failed install never rolls back the restored config files
+
+### Entry points
+- Offline CLI: `dsh-undo.ps1 undo|redo|restore -SyncDeps`
+- Model tool: `undo_restore` gains an optional `sync_deps` boolean
+- REST: `/api/undo/undo|redo|restore` accept optional `syncDeps`
+
+### Tests
+- smoke 106 → 112 (lockfile/home-patch snapshots, byte-level restore, default report-only, explicit sync command verification)
+- e2e 10/10, no regressions
+
 ## [0.3.5] - 2026-08-17
 
 ### Fixed

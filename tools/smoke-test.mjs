@@ -679,6 +679,52 @@ console.log('   ', out.split('\n')[0]);
 check(out.includes('Restored snapshot'), 'undo proceeds when the last turn is closed (not busy)');
 await rm(root17, { recursive: true, force: true });
 
+console.log('== 24. lockfile + home patch snapshots and dependency reconciliation ==');
+const root18 = await mkdtemp(join(tmpdir(), 'dsh-undo-test18-'));
+const home18 = join(root18, 'home'), profile18 = join(root18, 'profile'), snap18 = join(root18, 'snaps');
+await mkdir(home18, { recursive: true }); await mkdir(profile18, { recursive: true });
+await writeFile(join(home18, 'settings.yaml'), 'model: x\n');
+await writeFile(join(home18, 'cordis.patch.yml'), '# home patch\n[]\n');
+await writeFile(join(profile18, 'cordis.patch.yml'), '# patch\n[]\n');
+await writeFile(join(profile18, 'package.json'), '{"name":"test","v":1}\n');
+await writeFile(join(profile18, 'pnpm-workspace.yaml'), 'packages:\n  - .\n');
+await writeFile(join(profile18, 'pnpm-lock.yaml'), 'lockfileVersion: "9.0"\nv: 1\n');
+const tools18 = new Map();
+const ctx18 = {
+  tools: { register: (t) => { tools18.set(t.name, t); return () => { }; } },
+  systemPrompt: { section: () => () => { } }, get: () => undefined,
+  effect: (fn) => { const d = fn(); return d ?? (() => { }); }, logger: { info: () => { }, warn: () => { } },
+};
+apply(ctx18, { manualDir: join(snap18, 'manual'), autoDir: join(snap18, 'auto'), homeDir: home18, profileDir: profile18, profileName: 'web', watch: false, pluginDirs: [] });
+await new Promise((r) => setTimeout(r, 300));
+const run18 = async (name, args) => (await tools18.get(name).execute(args, {}));
+await run18('undo_snapshot', { reason: 'lock-v1' });
+const m18dir = (await readdir(join(snap18, 'manual'))).find((d) => !d.startsWith('.'));
+const m18 = JSON.parse(await readFile(join(snap18, 'manual', m18dir, 'manifest.json'), 'utf8'));
+check(m18.files.some((f) => f.name === 'profile-pnpm-lock.yaml'), 'snapshot includes profile pnpm-lock.yaml');
+check(m18.files.some((f) => f.name === 'home-cordis.patch.yml'), 'snapshot includes home cordis.patch.yml');
+await writeFile(join(profile18, 'package.json'), '{"name":"test","v":2}\n');
+await writeFile(join(profile18, 'pnpm-lock.yaml'), 'lockfileVersion: "9.0"\nv: 2\n');
+await run18('undo_snapshot', { reason: 'lock-v2' });
+out = await run18('undo_restore', { mode: 'undo' });
+check((await readFile(join(profile18, 'pnpm-lock.yaml'), 'utf8')).includes('v: 1'), 'undo restores pnpm-lock.yaml bytes');
+check(out.includes('dependency state may be out of sync'), 'default restore reports dependency drift without running pnpm');
+// fake pnpm on PATH: verify the explicit sync path and its command line
+const bin18 = join(root18, 'bin');
+await mkdir(bin18, { recursive: true });
+const marker18 = join(root18, 'pnpm-calls.txt');
+process.env.FAKE_PNPM_LOG = marker18;
+await writeFile(join(bin18, 'pnpm.cmd'), '@echo off\r\necho %*>> "%FAKE_PNPM_LOG%"\r\nexit /b 0\r\n');
+const oldPath18 = process.env.PATH;
+process.env.PATH = `${bin18};${oldPath18}`;
+await writeFile(join(profile18, 'package.json'), '{"name":"test","v":3}\n');
+await run18('undo_snapshot', { reason: 'lock-v3' });
+out = await run18('undo_restore', { mode: 'undo', sync_deps: true });
+process.env.PATH = oldPath18;
+check(out.includes('Dependencies synced'), 'sync_deps reports successful pnpm run');
+check((await readFile(marker18, 'utf8')).includes('install --frozen-lockfile'), 'sync ran pnpm install --frozen-lockfile');
+await rm(root18, { recursive: true, force: true });
+
 await rm(root, { recursive: true, force: true });
 console.log(`\n== RESULT: ${pass} passed, ${fail} failed ==`);
 process.exit(fail > 0 ? 1 : 0);

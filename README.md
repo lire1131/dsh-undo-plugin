@@ -56,7 +56,8 @@
 
 ## 快照内容与存储
 
-快照对象是 DSH 的 6 个配置文件:`cordis.patch.yml`、`package.json`、`cordis.yml`、`pnpm-workspace.yaml`(profile 下)+ `settings.yaml`、`.env`($DSH_HOME 下,默认 ~/.dsh)。
+快照对象是 DSH 的启动关键配置:`cordis.patch.yml`、`package.json`、`cordis.yml`、`pnpm-workspace.yaml`、`pnpm-lock.yaml`(profile 下)+ `cordis.patch.yml`、`settings.yaml`、`.env`、`.credentials.yaml`($DSH_HOME 下,默认 ~/.dsh)。
+恢复涉及 `package.json` / `pnpm-lock.yaml` 时,默认只报告 `node_modules` 可能不同步;需要真正重建依赖时加 `-SyncDeps`(离线 CLI)、`sync_deps: true`(对话工具)或 `syncDeps: true`(REST),插件会执行 `pnpm install --frozen-lockfile`(无 lockfile 时普通 `pnpm install`)。安装失败不影响已经还原的配置文件。
 
 | 库 | 默认路径(可在设置中修改) | 内容 |
 |---|---|---|
@@ -202,8 +203,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-undo-savepoint-gu
 powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-undo-savepoint.ps1" list
 powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-undo-savepoint.ps1" snapshot -Label "原因"
 powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-undo-savepoint.ps1" undo
+powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-undo-savepoint.ps1" undo -SyncDeps
 powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-undo-savepoint.ps1" redo
 powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-undo-savepoint.ps1" restore -Id <id> -Force
+powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-undo-savepoint.ps1" restore -Id <id> -Force -SyncDeps
 powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-undo-savepoint.ps1" remove -Id <id>
 powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-undo-savepoint.ps1" prune -KeepAuto 20
 
@@ -220,9 +223,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-plugin.ps1" add <
 | `GET /api/undo/status` | `{canUndo, canRedo, total}` |
 | `GET /api/undo/list` | 快照列表(含 location: manual/auto/legacy) |
 | `GET/POST /api/undo/settings` | 读/写保存参数(自动保存、防抖、保留数、目录),POST 即时生效 |
-| `POST /api/undo/undo` | 撤销上一步 |
-| `POST /api/undo/redo` | 恢复 |
-| `POST /api/undo/restore` | body `{id}` 回退到指定版本 |
+| `POST /api/undo/undo` | 撤销上一步;可选 body `{syncDeps: true}` 按还原后的 lockfile 重建 `node_modules` |
+| `POST /api/undo/redo` | 恢复;可选 body `{syncDeps: true}` |
+| `POST /api/undo/restore` | body `{id, syncDeps?}` 回退到指定版本 |
 | `POST /api/undo/remove` | body `{id}` 删除快照 |
 | `POST /api/undo/snapshot` | body `{reason}` 手动保存 |
 | `POST /api/undo/pick-dir` | 弹出系统目录选择器,返回选中路径 |
