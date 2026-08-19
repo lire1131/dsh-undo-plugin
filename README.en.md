@@ -1,6 +1,7 @@
 # dsh-undo-savepoint — Undo/rollback system for DSH
 
 [![awesome · DSH plugin](https://awesome-dsh-plugin.com/badge.svg)](https://awesome-dsh-plugin.com)
+[![CI](https://github.com/lire1131/dsh-undo-plugin/actions/workflows/ci.yml/badge.svg)](https://github.com/lire1131/dsh-undo-plugin/actions/workflows/ci.yml)
 
 > English | [中文](README.md) | [Changelog](CHANGELOG.en.md)
 
@@ -80,6 +81,12 @@ Explicit configuration always wins: `profileDir` / `manualDir` / `autoDir` / `pr
 The DSH data-home resolution matches the official launcher (`@deepseek-ai/dsh-home-paths`) exactly: **`$DSH_HOME` wins** (blank = unset; `~` / `~/` / `~\` prefixes supported), otherwise it falls back to `<user home>\.dsh`. The settings file (`$DSH_HOME\undo\settings.json`), default snapshot root (`$DSH_HOME\undo-snapshots`), profile dir (`$DSH_HOME\profiles\<profile>`), home root and plugin-discovery paths are all derived from it — third-party clients with a custom `DSH_HOME` no longer suffer the "two homes" split (settings written to `~/.dsh` while DSH actually uses `$DSH_HOME`), and custom directories survive restarts.
 
 Explicit overrides are preserved: `DSH_UNDO_SETTINGS` / `DSH_UNDO_ROOT` / `DSH_UNDO_EXPORT` (env vars) and the config keys `homeDir` / `profileDir` / `manualDir` / `autoDir` keep the highest precedence.
+
+## Repository topics
+
+So the repository is easier to find on GitHub search & Explore, these topics are set on the repo:
+
+`deepseek-harness` · `dsh` · `dsh-plugin` · `undo` · `rollback` · `snapshot` · `crash-recovery` · `backup` · `windows` · `powershell`
 
 ## Installation
 
