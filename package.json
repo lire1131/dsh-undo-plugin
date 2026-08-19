@@ -29,5 +29,27 @@
     }
   },
   "files": ["lib", "tools", "cordis.patch.yml"],
-  "license": "MIT"
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lire1131/dsh-undo-plugin.git"
+  },
+  "homepage": "https://github.com/lire1131/dsh-undo-plugin",
+  "bugs": {
+    "url": "https://github.com/lire1131/dsh-undo-plugin/issues"
+  },
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "plugin",
+    "undo",
+    "redo",
+    "rollback",
+    "snapshot",
+    "backup",
+    "crash-recovery",
+    "safe-mode",
+    "windows",
+    "powershell"
+  ]
 }
