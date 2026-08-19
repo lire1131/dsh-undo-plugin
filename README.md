@@ -1,6 +1,7 @@
 # dsh-undo-savepoint — DSH 撤销/回退系统
 
 [![awesome · DSH plugin](https://awesome-dsh-plugin.com/badge.svg)](https://awesome-dsh-plugin.com)
+[![CI](https://github.com/lire1131/dsh-undo-plugin/actions/workflows/ci.yml/badge.svg)](https://github.com/lire1131/dsh-undo-plugin/actions/workflows/ci.yml)
 
 > 中文 | [English](README.en.md) | [更新日志](CHANGELOG.md)
 
@@ -82,6 +83,12 @@
 DSH 数据家目录的解析与官方启动器(`@deepseek-ai/dsh-home-paths`)完全一致:**`DSH_HOME` 环境变量优先**(空白视为未设置,支持 `~` / `~/` / `~\` 前缀),否则回退 `<用户家目录>\.dsh`。设置文件(`$DSH_HOME\undo\settings.json`)、默认快照根(`$DSH_HOME\undo-snapshots`)、profile 目录(`$DSH_HOME\profiles\<profile>`)、home 根、插件发现路径全部基于它——第三方客户端(自定义 `DSH_HOME`)不再出现"设置写到 `~/.dsh`、DSH 实际用 `$DSH_HOME`"的两套家分裂,重启后自定义目录稳定保留。
 
 显式覆盖仍然保留:`DSH_UNDO_SETTINGS` / `DSH_UNDO_ROOT` / `DSH_UNDO_EXPORT`(环境变量)与 config 里的 `homeDir` / `profileDir` / `manualDir` / `autoDir` 优先级最高。
+
+## 仓库标签 (Topics)
+
+方便在 GitHub 搜索与 Explore 中被发现,仓库已设置以下 topics:
+
+`deepseek-harness` · `dsh` · `dsh-plugin` · `undo` · `rollback` · `snapshot` · `crash-recovery` · `backup` · `windows` · `powershell`
 
 ## 安装
 
