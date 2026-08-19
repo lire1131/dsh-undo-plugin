@@ -32,11 +32,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/lire1131/dsh-undo-plugin.git"
+    "url": "git+https://github.com/lire1131/dsh-undo-savepoint.git"
   },
-  "homepage": "https://github.com/lire1131/dsh-undo-plugin",
+  "homepage": "https://github.com/lire1131/dsh-undo-savepoint",
   "bugs": {
-    "url": "https://github.com/lire1131/dsh-undo-plugin/issues"
+    "url": "https://github.com/lire1131/dsh-undo-savepoint/issues"
   },
   "keywords": [
     "deepseek-harness",
