@@ -1,7 +1,5 @@
 # dsh-undo-savepoint — DSH 撤销/回退系统
 
-![cover](docs/cover.png)
-
 [![awesome · DSH plugin](https://awesome-dsh-plugin.com/badge.svg)](https://awesome-dsh-plugin.com)
 [![CI](https://github.com/lire1131/dsh-undo-plugin/actions/workflows/ci.yml/badge.svg)](https://github.com/lire1131/dsh-undo-plugin/actions/workflows/ci.yml)
 

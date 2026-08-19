@@ -3,15 +3,13 @@
 # Works WITHOUT DSH running: reads/writes the same snapshot stores and the
 # same manifest format as the dsh-undo-savepoint DSH plugin.
 #
-# Store layout (mirrors lib/index.js): defaults are based on the DSH home
-# directory (issue #6: prefer $env:DSH_HOME, fall back to ~/.dsh). Values
-# stored in the settings file take precedence via Get-UndoSettings. The same
-# environment overrides as the Node plugin are honored (DSH_UNDO_ROOT / DSH_UNDO_SETTINGS).
+# Store layout (mirrors lib/index.js): defaults are based on DSH_HOME
+# (issue #6: DSH_HOME env var, fallback ~/.dsh — same as the official launcher).
+# Values stored in the settings file take precedence via Get-UndoSettings.
+# The same environment overrides as the Node plugin are honored
+# (DSH_UNDO_ROOT / DSH_UNDO_SETTINGS).
 
-# Issue #6: DSH home = DSH_HOME env (non-empty) or ~/.dsh — mirrors DSH's
-# own resolveDshHome() in @deepseek-ai/dsh-home-paths. Empty/whitespace-only
-# DSH_HOME is treated as unset (never resolves home to cwd).
-$script:DshHome = if ($env:DSH_HOME -and $env:DSH_HOME.Trim().Length -gt 0) { $env:DSH_HOME } else { Join-Path $env:USERPROFILE '.dsh' }
+$script:DshHome = if ($env:DSH_HOME) { $env:DSH_HOME } else { Join-Path $env:USERPROFILE '.dsh' }
 $script:UndoSnapshotRoot = if ($env:DSH_UNDO_ROOT) { $env:DSH_UNDO_ROOT } else { Join-Path $script:DshHome 'undo-snapshots' }
 $script:UndoLegacyRoot = $script:UndoSnapshotRoot
 $script:UndoManualDir = Join-Path $script:UndoSnapshotRoot 'manual'
@@ -120,7 +118,7 @@ function Get-UndoPlugins {
         }
         return @($out)
     }
-    $roots = @((Join-Path $env:USERPROFILE 'node_modules'))
+    $roots = @((Join-Path $script:DshHome 'node_modules'))
     foreach ($root in $roots) {
         if (-not (Test-Path -LiteralPath $root)) { continue }
         foreach ($item in Get-ChildItem -LiteralPath $root -Force -ErrorAction SilentlyContinue) {
@@ -294,12 +292,11 @@ function Set-UndoSafeMode([bool]$On) {
     if ($On) {
         if ($st.active) { return @{ ok = $true; active = $true; message = "Safe mode is already ON (entered $($st.enteredAt))." } }
         $snap = New-UndoSnapshot 'manual' 'safe-mode-before'
-        New-Item -ItemType Directory -Force -Path $settings.autoDir | Out-Null
         $backup = Join-Path $settings.autoDir "safe-mode-backup-$($snap.id).yml"
         if (Test-Path -LiteralPath $patch) { Copy-Item -LiteralPath $patch -Destination $backup -Force }
-        else { [System.IO.File]::WriteAllText($backup, "# (no cordis.patch.yml existed when safe mode was entered)`n[]`n", (New-Object System.Text.UTF8Encoding($false))) }
         $minimal = "# dsh-undo-savepoint SAFE MODE (entered $(Get-Date -Format o))`n# All user plugins except dsh-undo-savepoint are temporarily disabled.`n- insert:`n    - id: dsh-undo-savepoint`n      name: dsh-undo-savepoint`n"
         [System.IO.File]::WriteAllText($patch, $minimal, (New-Object System.Text.UTF8Encoding($false)))
+        New-Item -ItemType Directory -Force -Path $settings.autoDir | Out-Null
         $stJson = @{ active = $true; enteredAt = (Get-Date).ToUniversalTime().ToString('o'); backup = $backup; snapshotId = $snap.id } | ConvertTo-Json -Depth 5
         [System.IO.File]::WriteAllText($stateFile, $stJson, (New-Object System.Text.UTF8Encoding($false)))
         return @{ ok = $true; active = $true; snapshotId = $snap.id; message = "Safe mode ON (pre-snapshot $($snap.id)). Restart DSH to boot with only dsh-undo-savepoint." }
@@ -685,7 +682,7 @@ function Invoke-UndoPrune {
 function Test-UndoCanResolve([string]$Name) {
     if ([string]::IsNullOrEmpty($Name)) { return $false }
     $anchors = @(
-        (Join-Path $env:USERPROFILE 'node_modules'),
+        (Join-Path $script:DshHome 'node_modules'),
         (Join-Path $script:UndoProfileRoot 'node_modules'),
         (Join-Path $script:UndoProfileRoot '..\node_modules'),
         (Join-Path $PSScriptRoot '..\node_modules')
