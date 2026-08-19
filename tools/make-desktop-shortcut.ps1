@@ -1,4 +1,4 @@
-﻿# make-desktop-shortcut.ps1 — 在桌面一键创建「DSH 撤销管理器」快捷方式
+# make-desktop-shortcut.ps1 — 在桌面一键创建「DSH 撤销管理器」快捷方式
 #
 # 用途：解决"装完插件找不到局外撤销工具"的问题。
 # 自动定位插件目录（按顺序）：
@@ -39,7 +39,7 @@ function Find-UndoToolsDir {
 $toolsDir = Find-UndoToolsDir
 if (-not $toolsDir) {
     Write-Host '未找到 dsh-undo-savepoint 插件（tools 目录不存在）。请先安装插件：'
-    Write-Host '  dsh plugin --profile web add github:lire1131/dsh-undo-plugin#master'
+    Write-Host '  dsh plugin --profile web add github:lire1131/dsh-undo-savepoint#master'
     Write-Host '安装后重跑本脚本。'
     Read-Host '按回车退出'
     exit 1

@@ -1,7 +1,7 @@
 # dsh-undo-savepoint — Undo/rollback system for DSH
 
 [![awesome · DSH plugin](https://awesome-dsh-plugin.com/badge.svg)](https://awesome-dsh-plugin.com)
-[![CI](https://github.com/lire1131/dsh-undo-plugin/actions/workflows/ci.yml/badge.svg)](https://github.com/lire1131/dsh-undo-plugin/actions/workflows/ci.yml)
+[![CI](https://github.com/lire1131/dsh-undo-savepoint/actions/workflows/ci.yml/badge.svg)](https://github.com/lire1131/dsh-undo-savepoint/actions/workflows/ci.yml)
 
 > English | [中文](README.md) | [Changelog](CHANGELOG.en.md)
 
@@ -13,19 +13,19 @@ An undo/rollback system for [DeepSeek Harness (DSH)](https://github.com/deepseek
 
 | v0.3.5 conversation header: iconized Undo / Redo / Snapshots buttons + auto-snapshot status badge (click the badge to open the panel) |
 |---|
-| ![header](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-plugin@master/docs/webui-header.png) |
+| ![header](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/webui-header.png) |
 
 | WebUI snapshot manager (diff / restore / delete / clean-up / export / import / SAFE MODE) | WebUI Settings — own "Snapshots" section (sensitive mode / plugin whitelist / dir pickers) |
 |---|---|
-| ![panel](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-plugin@master/docs/webui-panel.png) | ![settings](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-plugin@master/docs/webui-settings-section.png) |
+| ![panel](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/webui-panel.png) | ![settings](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/webui-settings-section.png) |
 
 | Offline GUI (two-row toolbar + SAFE MODE button; works when DSH is down) | Offline settings dialog (sensitive mode / Browse dirs) |
 |---|---|
-| ![gui](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-plugin@master/docs/gui-main.png) | ![guisettings](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-plugin@master/docs/gui-settings.png) |
+| ![gui](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/gui-main.png) | ![guisettings](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/gui-settings.png) |
 
 | SAFE MODE confirmation (enter / exit) | SAFE MODE status notice |
 |---|---|
-| ![confirm](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-plugin@master/docs/safe-mode-confirm.png) | ![done](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-plugin@master/docs/safe-mode-done.png) |
+| ![confirm](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/safe-mode-confirm.png) | ![done](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/safe-mode-done.png) |
 
 ## Features
 
@@ -95,7 +95,7 @@ Prerequisites: DSH (`@deepseek-ai/dsh`) and Node.js (≥20).
 **Option A (recommended, ecosystem standard)** — this plugin declares a `dsh.bundle` manifest, so install it with the official plugin command:
 
 ```bat
-dsh plugin --profile web add github:lire1131/dsh-undo-plugin#master
+dsh plugin --profile web add github:lire1131/dsh-undo-savepoint#master
 ```
 
 Restart DSH after installing. Snapshot directories and options are configurable in Settings.
@@ -105,7 +105,7 @@ Restart DSH after installing. Snapshot directories and options are configurable 
 1. **Clone the repository** into a local plugins directory (an ASCII path is safer), e.g. `D:\dsh\plugins\dsh-undo-savepoint`:
 
 ```bat
-git clone https://github.com/lire1131/dsh-undo-plugin.git D:\dsh\plugins\dsh-undo-savepoint
+git clone https://github.com/lire1131/dsh-undo-savepoint.git D:\dsh\plugins\dsh-undo-savepoint
 ```
 
 2. **Create a junction** so DSH's module resolver can find the local package by name `dsh-undo-savepoint` (used by both the host plugin and the WebUI client plugin):
@@ -137,8 +137,6 @@ The external undo tools (GUI window + CLI) are **not placed on the desktop** —
 | Method A: `dsh plugin add` | `$DSH_HOME\profiles\web\node_modules\dsh-undo-savepoint\tools\` (DSH_HOME defaults to `%USERPROFILE%\.dsh`) |
 | Method B: clone + junction | your clone `...\dsh-undo-savepoint\tools\` |
 
-> ⚠️ The install command references the repo name `dsh-undo-plugin`, but the installed folder is named after the **package name `dsh-undo-savepoint`** — searching by "repo name" will not find it.
-
 **One-click desktop shortcut (recommended — open the tools straight from the desktop afterwards):**
 
 Double-click `tools\make-desktop-shortcut.bat` (it auto-locates the plugin directory) and a **DSH Undo Manager** icon appears on the desktop;
@@ -154,7 +152,7 @@ if ($d) {
   $s.WorkingDirectory = Join-Path $d 'tools'
   $s.Save()
   Write-Host "Desktop shortcut created: $($s.FullName)"
-} else { Write-Host 'Plugin directory not found — install it first: dsh plugin --profile web add github:lire1131/dsh-undo-plugin#master' }
+} else { Write-Host 'Plugin directory not found — install it first: dsh plugin --profile web add github:lire1131/dsh-undo-savepoint#master' }
 ```
 
 **Just want to open the tools folder:**

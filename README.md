@@ -1,7 +1,7 @@
 # dsh-undo-savepoint — DSH 撤销/回退系统
 
 [![awesome · DSH plugin](https://awesome-dsh-plugin.com/badge.svg)](https://awesome-dsh-plugin.com)
-[![CI](https://github.com/lire1131/dsh-undo-plugin/actions/workflows/ci.yml/badge.svg)](https://github.com/lire1131/dsh-undo-plugin/actions/workflows/ci.yml)
+[![CI](https://github.com/lire1131/dsh-undo-savepoint/actions/workflows/ci.yml/badge.svg)](https://github.com/lire1131/dsh-undo-savepoint/actions/workflows/ci.yml)
 
 > 中文 | [English](README.en.md) | [更新日志](CHANGELOG.md)
 
@@ -15,19 +15,19 @@
 
 | v0.3.5 会话头部:撤销/恢复/快照按钮全部图标化 + 自动快照状态徽章(点击徽章打开快照面板) |
 |---|
-| ![header](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-plugin@master/docs/webui-header.png) |
+| ![header](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/webui-header.png) |
 
 | WebUI 快照管理面板(差异/回退/删除/清理/导出/导入/安全模式) | WebUI 设置「快照」独立栏目(敏感模式/插件白名单/目录选择) |
 |---|---|
-| ![panel](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-plugin@master/docs/webui-panel.png) | ![settings](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-plugin@master/docs/webui-settings-section.png) |
+| ![panel](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/webui-panel.png) | ![settings](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/webui-settings-section.png) |
 
 | 局外程序窗口(两行工具栏 + 安全模式按钮,DSH 挂了也能用) | 局外设置对话框(敏感模式/浏览选目录) |
 |---|---|
-| ![gui](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-plugin@master/docs/gui-main.png) | ![guisettings](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-plugin@master/docs/gui-settings.png) |
+| ![gui](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/gui-main.png) | ![guisettings](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/gui-settings.png) |
 
 | 安全模式确认(进入/退出) | 安全模式状态提示 |
 |---|---|
-| ![confirm](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-plugin@master/docs/safe-mode-confirm.png) | ![done](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-plugin@master/docs/safe-mode-done.png) |
+| ![confirm](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/safe-mode-confirm.png) | ![done](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/safe-mode-done.png) |
 
 ## 功能一览
 
@@ -97,7 +97,7 @@ DSH 数据家目录的解析与官方启动器(`@deepseek-ai/dsh-home-paths`)完
 **方式 A(推荐,生态标准一条命令)** — 本插件已声明 `dsh.bundle` manifest,可直接用官方插件命令安装:
 
 ```bat
-dsh plugin --profile web add github:lire1131/dsh-undo-plugin#master
+dsh plugin --profile web add github:lire1131/dsh-undo-savepoint#master
 ```
 
 安装完成后重启 DSH 即生效(快照目录、参数等均可在设置中修改)。
@@ -107,7 +107,7 @@ dsh plugin --profile web add github:lire1131/dsh-undo-plugin#master
 1. **把仓库放到本地插件目录**(无中文路径更稳妥),例如 `D:\dsh\plugins\dsh-undo-savepoint`:
 
 ```bat
-git clone https://github.com/lire1131/dsh-undo-plugin.git D:\dsh\plugins\dsh-undo-savepoint
+git clone https://github.com/lire1131/dsh-undo-savepoint.git D:\dsh\plugins\dsh-undo-savepoint
 ```
 
 2. **建立 junction**,让 DSH 的模块解析器通过包名 `dsh-undo-savepoint` 找到本地源码(host 插件与 WebUI client 插件都靠它):
@@ -139,8 +139,6 @@ mklink /J "<你的DSH安装>\node_modules\dsh-undo-savepoint" "D:\dsh\plugins\ds
 | 方式 A:`dsh plugin add` | `$DSH_HOME\profiles\web\node_modules\dsh-undo-savepoint\tools\`(DSH_HOME 默认 %USERPROFILE%\.dsh) |
 | 方式 B:clone + junction | 你 clone 的目录 `...\dsh-undo-savepoint\tools\` |
 
-> ⚠️ 注意:安装命令里的仓库名是 `dsh-undo-plugin`,但装好后目录名是**包名 `dsh-undo-savepoint`**——按"仓库名"去找目录是找不到的。
-
 **一键创建桌面快捷方式(推荐,以后从桌面直接打开):**
 
 双击 `tools\make-desktop-shortcut.bat`(它会自动定位插件目录),桌面出现「DSH撤销管理器」图标;
@@ -156,7 +154,7 @@ if ($d) {
   $s.WorkingDirectory = Join-Path $d 'tools'
   $s.Save()
   Write-Host "已创建桌面快捷方式:$($s.FullName)"
-} else { Write-Host '未找到插件目录,请先安装:dsh plugin --profile web add github:lire1131/dsh-undo-plugin#master' }
+} else { Write-Host '未找到插件目录,请先安装:dsh plugin --profile web add github:lire1131/dsh-undo-savepoint#master' }
 ```
 
 **只想打开工具目录看一眼:**
