@@ -3,10 +3,11 @@
 # Usage:
 #   .\dsh-undo.ps1 snapshot [-Label "before installing X"]   # manual save
 #   .\dsh-undo.ps1 undo                                       # undo the last change
+#   .\dsh-undo.ps1 undo -SyncDeps                             # undo and rebuild node_modules from the restored lockfile
 #   .\dsh-undo.ps1 redo                                       # redo the last undo
 #   .\dsh-undo.ps1 list                                       # visual list
 #   .\dsh-undo.ps1 diff -Id <id|latest>
-#   .\dsh-undo.ps1 restore -Id <id|latest> [-Force]           # restore a fixed version
+#   .\dsh-undo.ps1 restore -Id <id|latest> [-Force] [-SyncDeps]
 #   .\dsh-undo.ps1 remove -Id <id>                            # delete a snapshot
 #   .\dsh-undo.ps1 prune [-KeepAuto 20]
 #   .\dsh-undo.ps1 status
@@ -22,7 +23,8 @@ param(
     [string]$Label = '',
     [string]$Id = '',
     [int]$KeepAuto = 20,
-    [switch]$Force
+    [switch]$Force,
+    [switch]$SyncDeps
 )
 
 $ErrorActionPreference = 'Stop'
@@ -35,7 +37,7 @@ switch ($Command) {
         Write-Host "Manual snapshot $($s.id) created ($(@($s.files).Count) file(s), reason: $reason). Store: $((Get-UndoSettings).manualDir)"
     }
     'undo' {
-        $r = Invoke-UndoRestore 'undo' ''
+        $r = Invoke-UndoRestore 'undo' '' -SyncDeps:$SyncDeps
         if (-not $r.ok) { Write-Host "undo failed: $($r.error)"; exit 1 }
         if ($r.unchanged) { Write-Host $r.message; exit 0 }
         Write-Host "Undone: restored $($r.targetId) ($($r.targetKind): $($r.targetReason))"
@@ -44,6 +46,13 @@ switch ($Command) {
         if ($r.remounted) { Write-Host 'dsh-undo mount re-ensured in cordis.patch.yml' }
         if ($r.missing -and @($r.missing).Count -gt 0) { Write-Host "Not restored: $($r.missing -join ', ')" }
         if ($r.needsRestart) { Write-Host 'NOTE: a restart of DSH is required for the restored state to take effect.' }
+        if ($r.deps.touched) {
+            if ($r.deps.synced) { Write-Host "Dependencies synced: $($r.deps.command)" }
+            else {
+                Write-Host "WARNING $($r.deps.note)"
+                Write-Host 'Restored config files are in place; re-run with -SyncDeps to rebuild dependencies automatically.'
+            }
+        }
         if ($r.preflight -and @($r.preflight.missing).Count -gt 0) {
             Write-Host "WARNING Cross-machine preflight: not resolvable on this machine: $($r.preflight.missing -join ', ')"
             Write-Host 'DSH may fail to start after restore - install them first, or run: dsh-undo.ps1 safe-mode -Label on'
@@ -51,12 +60,19 @@ switch ($Command) {
         foreach ($n in @($r.notes)) { Write-Host "Note: $n" }
     }
     'redo' {
-        $r = Invoke-UndoRestore 'redo' ''
+        $r = Invoke-UndoRestore 'redo' '' -SyncDeps:$SyncDeps
         if (-not $r.ok) { Write-Host "redo failed: $($r.error)"; exit 1 }
         Write-Host "Redone: re-applied $($r.targetId)"
         Write-Host "Files: $($r.restored -join ', ')"
         if ($r.missing -and @($r.missing).Count -gt 0) { Write-Host "Not restored: $($r.missing -join ', ')" }
         if ($r.needsRestart) { Write-Host 'NOTE: a restart of DSH is required for the restored state to take effect.' }
+        if ($r.deps.touched) {
+            if ($r.deps.synced) { Write-Host "Dependencies synced: $($r.deps.command)" }
+            else {
+                Write-Host "WARNING $($r.deps.note)"
+                Write-Host 'Restored config files are in place; re-run with -SyncDeps to rebuild dependencies automatically.'
+            }
+        }
         foreach ($n in @($r.notes)) { Write-Host "Note: $n" }
     }
     'list' {
@@ -83,7 +99,7 @@ switch ($Command) {
     'restore' {
         if ([string]::IsNullOrEmpty($Id)) { throw 'restore requires -Id <id|latest>' }
         $targetId = if ($Id -eq 'latest') { @(Get-UndoSnapshots)[0].id } else { $Id }
-        $r = Invoke-UndoRestore 'id' $targetId
+        $r = Invoke-UndoRestore 'id' $targetId -SyncDeps:$SyncDeps
         if (-not $r.ok) { Write-Host "restore failed: $($r.error)"; exit 1 }
         Write-Host "Restored $($r.targetId) ($($r.targetKind): $($r.targetReason))"
         Write-Host "Files: $($r.restored -join ', ')"
@@ -91,6 +107,13 @@ switch ($Command) {
         if ($r.remounted) { Write-Host 'dsh-undo mount re-ensured in cordis.patch.yml' }
         if ($r.missing -and @($r.missing).Count -gt 0) { Write-Host "Not restored: $($r.missing -join ', ')" }
         if ($r.needsRestart) { Write-Host 'NOTE: a restart of DSH is required for the restored state to take effect.' }
+        if ($r.deps.touched) {
+            if ($r.deps.synced) { Write-Host "Dependencies synced: $($r.deps.command)" }
+            else {
+                Write-Host "WARNING $($r.deps.note)"
+                Write-Host 'Restored config files are in place; re-run with -SyncDeps to rebuild dependencies automatically.'
+            }
+        }
         if ($r.preflight -and @($r.preflight.missing).Count -gt 0) {
             Write-Host "WARNING Cross-machine preflight: not resolvable on this machine: $($r.preflight.missing -join ', ')"
             Write-Host 'DSH may fail to start after restore - install them first, or run: dsh-undo.ps1 safe-mode -Label on'

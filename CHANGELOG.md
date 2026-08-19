@@ -2,6 +2,24 @@
 
 dsh-undo-savepoint 的重要变更。日期为本地时间(UTC+8)。English version: [CHANGELOG.en.md](CHANGELOG.en.md)
 
+## [0.3.6] - 2026-08-20
+
+### 修复
+- **快照补齐启动关键文件**：新增 profile 级 `pnpm-lock.yaml` 与 home 级 `cordis.patch.yml`，与 `dsh plugin add/update/remove` 实际改动的状态对齐（issue #8）
+- **恢复后对账依赖状态**：undo/redo/restore 触及 `package.json` / `pnpm-lock.yaml` / `pnpm-workspace.yaml` 时，默认报告 `node_modules` 可能不同步并给出重建命令；显式开启同步时执行 `pnpm install --frozen-lockfile`（无 lockfile 回退普通 `pnpm install`），安装失败不回滚已还原的配置文件
+
+### 优化
+- **README 与 npm 发布版对齐**：恢复 `dsh plugin --profile web add dsh-undo-savepoint` / `npm install dsh-undo-savepoint`（方式 A）与 GitHub 直装（方式 A2）说明，与已发布到 npm 的 0.3.5 包一致
+
+### 入口
+- 离线 CLI：`dsh-undo.ps1 undo|redo|restore -SyncDeps`
+- 模型工具：`undo_restore` 新增 `sync_deps` 布尔参数
+- REST：`/api/undo/undo|redo|restore` 接受可选 `syncDeps`
+
+### 测试
+- smoke 106 → 112（新增 lockfile/home patch 快照、字节级还原、默认不同步、显式同步命令校验）
+- e2e 10/10 无回归
+
 ## [0.3.5] - 2026-08-17
 
 ### 修复

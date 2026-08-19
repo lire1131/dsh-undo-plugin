@@ -44,6 +44,8 @@ $script:UndoFileSpecs = @(
     @{ RootKey = 'profile'; Root = $script:UndoProfileRoot; Name = 'package.json' },
     @{ RootKey = 'profile'; Root = $script:UndoProfileRoot; Name = 'cordis.yml' },
     @{ RootKey = 'profile'; Root = $script:UndoProfileRoot; Name = 'pnpm-workspace.yaml' },
+    @{ RootKey = 'profile'; Root = $script:UndoProfileRoot; Name = 'pnpm-lock.yaml' },
+    @{ RootKey = 'home';    Root = $script:UndoHomeRoot;    Name = 'cordis.patch.yml' },
     @{ RootKey = 'home';    Root = $script:UndoHomeRoot;    Name = 'settings.yaml' },
     @{ RootKey = 'home';    Root = $script:UndoHomeRoot;    Name = '.env' },
     @{ RootKey = 'home';    Root = $script:UndoHomeRoot;    Name = '.credentials.yaml' }
@@ -733,7 +735,56 @@ function Test-UndoNeedsRestart([string[]]$Restored) {
     return $false
 }
 
-function Invoke-UndoRestore([string]$Mode, [string]$Id) {
+# Dependency reconciliation after a restore that touched package.json /
+# pnpm-lock.yaml / pnpm-workspace.yaml. Default is report-only; pnpm runs
+# only when the caller asks for it, and a sync failure never invalidates the
+# restored config files.
+function Invoke-UndoSyncDeps([string[]]$Restored, [bool]$SyncDeps) {
+    $touched = $false
+    foreach ($n in @($Restored)) {
+        if ($n -eq 'profile-package.json' -or $n -eq 'profile-pnpm-lock.yaml' -or $n -eq 'profile-pnpm-workspace.yaml') { $touched = $true; break }
+    }
+    if (-not $touched) { return @{ touched = $false; synced = $false } }
+    if (-not $SyncDeps) {
+        return @{
+            touched = $true
+            synced = $false
+            note = "dependency state may be out of sync - run 'dsh plugin --profile $script:UndoProfileName install' (or 'pnpm install --frozen-lockfile' in $script:UndoProfileRoot)"
+        }
+    }
+    $lockPath = Join-Path $script:UndoProfileRoot 'pnpm-lock.yaml'
+    $args = @('install')
+    if (Test-Path -LiteralPath $lockPath) { $args += '--frozen-lockfile' }
+    $command = "pnpm $($args -join ' ')"
+    $startedAt = [DateTime]::UtcNow
+    Push-Location $script:UndoProfileRoot
+    try {
+        $output = & pnpm @args 2>&1
+        $code = $LASTEXITCODE
+        $ok = ($code -eq 0)
+    } catch {
+        $output = @($_.Exception.Message)
+        $code = 1
+        $ok = $false
+    } finally {
+        Pop-Location
+    }
+    $text = (($output | Out-String) -replace "`r", '')
+    if ($text.Length -gt 4000) { $text = $text.Substring($text.Length - 4000) }
+    return @{
+        touched = $true
+        synced = $ok
+        command = $command
+        profileDir = $script:UndoProfileRoot
+        durationMs = [int]([DateTime]::UtcNow - $startedAt).TotalMilliseconds
+        code = $code
+        stdout = $text
+        stderr = if ($ok) { '' } else { $text }
+        note = if ($ok) { "dependencies synced ($command)" } else { "dependency sync failed ($command): $text" }
+    }
+}
+
+function Invoke-UndoRestore([string]$Mode, [string]$Id, [switch]$SyncDeps) {
     if ($Mode -eq 'undo') {
         $candidates = Get-UndoCandidates
         if (@($candidates).Count -eq 0) { return @{ ok = $false; error = 'nothing to undo' } }
@@ -749,7 +800,8 @@ function Invoke-UndoRestore([string]$Mode, [string]$Id) {
         $remounted = Ensure-UndoMount
         $preflight = Get-UndoPreflight $target.s
         $needsRestart = Test-UndoNeedsRestart $applied.restored
-        return @{ ok = $true; restored = $applied.restored; missing = $applied.missing; notes = $applied.notes; needsRestart = $needsRestart; preflight = $preflight; targetId = $target.s.id; targetKind = $target.s.kind; targetReason = $target.s.reason; preSnapshotId = $pre.id; remounted = $remounted }
+        $deps = Invoke-UndoSyncDeps $applied.restored $SyncDeps
+        return @{ ok = $true; restored = $applied.restored; missing = $applied.missing; notes = $applied.notes; needsRestart = $needsRestart; deps = $deps; preflight = $preflight; targetId = $target.s.id; targetKind = $target.s.kind; targetReason = $target.s.reason; preSnapshotId = $pre.id; remounted = $remounted }
     }
     if ($Mode -eq 'redo') {
         $list = Get-UndoSnapshots
@@ -765,7 +817,8 @@ function Invoke-UndoRestore([string]$Mode, [string]$Id) {
         Set-UndoFlag $pre 'consumed' $true
         $preflight = Get-UndoPreflight $pre
         $needsRestart = Test-UndoNeedsRestart $applied.restored
-        return @{ ok = $true; restored = $applied.restored; missing = $applied.missing; notes = $applied.notes; needsRestart = $needsRestart; preflight = $preflight; targetId = $pre.id; remounted = $false }
+        $deps = Invoke-UndoSyncDeps $applied.restored $SyncDeps
+        return @{ ok = $true; restored = $applied.restored; missing = $applied.missing; notes = $applied.notes; needsRestart = $needsRestart; deps = $deps; preflight = $preflight; targetId = $pre.id; remounted = $false }
     }
     # mode 'id'
     $target = Get-UndoSnapshotById $Id
@@ -775,7 +828,8 @@ function Invoke-UndoRestore([string]$Mode, [string]$Id) {
     $remounted = Ensure-UndoMount
     $preflight = Get-UndoPreflight $target
     $needsRestart = Test-UndoNeedsRestart $applied.restored
-    return @{ ok = $true; restored = $applied.restored; missing = $applied.missing; notes = $applied.notes; needsRestart = $needsRestart; preflight = $preflight; targetId = $target.id; targetKind = $target.kind; targetReason = $target.reason; preSnapshotId = $pre.id; remounted = $remounted }
+    $deps = Invoke-UndoSyncDeps $applied.restored $SyncDeps
+    return @{ ok = $true; restored = $applied.restored; missing = $applied.missing; notes = $applied.notes; needsRestart = $needsRestart; deps = $deps; preflight = $preflight; targetId = $target.id; targetKind = $target.kind; targetReason = $target.reason; preSnapshotId = $pre.id; remounted = $remounted }
 }
 
 function Remove-UndoSnapshot([string]$Id) {

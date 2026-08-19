@@ -4,6 +4,8 @@
     { "root": "profile", "rel": "package.json" },
     { "root": "profile", "rel": "cordis.yml" },
     { "root": "profile", "rel": "pnpm-workspace.yaml" },
+    { "root": "profile", "rel": "pnpm-lock.yaml" },
+    { "root": "home", "rel": "cordis.patch.yml" },
     { "root": "home", "rel": "settings.yaml" },
     { "root": "home", "rel": ".env" },
     { "root": "home", "rel": ".credentials.yaml" }

@@ -305,6 +305,12 @@ $form.Controls.Add($status)
 
 function Set-Status([string]$Text) { $status.Text = $Text }
 
+function Show-DepsNote($R) {
+    if ($R.deps.touched -and -not $R.deps.synced) {
+        Set-Status "$($status.Text)  |  $($R.deps.note)"
+    }
+}
+
 function Update-List {
     $list.Items.Clear()
     $snaps = Get-UndoSnapshots
@@ -341,6 +347,7 @@ function Invoke-QuickUndo([string]$Mode) {
         } else {
             Set-Status ($script:UI.redone -f $r.targetId)
         }
+        Show-DepsNote $r
         Update-List
     } catch {
         Set-Status ($script:UI.fail -f $_.Exception.Message)
@@ -360,6 +367,7 @@ function Restore-Selected {
         $r = Invoke-UndoRestore 'id' $id
         if (-not $r.ok) { Set-Status ($script:UI.restoreFail -f $r.error); return }
         Set-Status ($script:UI.restored -f $r.targetId, $r.preSnapshotId)
+        Show-DepsNote $r
         Update-List
     } catch {
         Set-Status ($script:UI.restoreFail -f $_.Exception.Message)
@@ -442,6 +450,7 @@ function Boot-Rollback {
     if (-not $r.ok) { Set-Status ($script:UI.fail -f $r.error); return }
     if ($r.unchanged) { Set-Status $r.message; return }
     Set-Status ($script:UI.undone -f $r.targetId, $r.preSnapshotId)
+    Show-DepsNote $r
     if ($r.needsRestart) { [void][System.Windows.Forms.MessageBox]::Show($script:UI.restartRequired, 'DSH Undo', 'OK', 'Information') }
     Update-List
 }

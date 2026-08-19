@@ -54,7 +54,9 @@ An undo/rollback system for [DeepSeek Harness (DSH)](https://github.com/deepseek
 
 ## What is snapshotted & where
 
-The snapshot captures DSH's 6 config files: `cordis.patch.yml`, `package.json`, `cordis.yml`, `pnpm-workspace.yaml` (under the profile) + `settings.yaml`, `.env` (under `$DSH_HOME`, default `~/.dsh`).
+The snapshot captures DSH's boot-critical config: `cordis.patch.yml`, `package.json`, `cordis.yml`, `pnpm-workspace.yaml`, `pnpm-lock.yaml` (under the profile) + `cordis.patch.yml`, `settings.yaml`, `.env`, `.credentials.yaml` (under `$DSH_HOME`, default `~/.dsh`).
+
+When a restore touches `package.json` / `pnpm-lock.yaml`, the default behavior only reports that `node_modules` may be out of sync. To rebuild dependencies, pass `-SyncDeps` (offline CLI), `sync_deps: true` (chat tool), or `syncDeps: true` (REST); the plugin runs `pnpm install --frozen-lockfile` (plain `pnpm install` when there is no lockfile). A failed install leaves the restored config files in place.
 
 | Store | Default path (configurable in settings) | Contents |
 |---|---|---|
@@ -92,13 +94,25 @@ So the repository is easier to find on GitHub search & Explore, these topics are
 
 Prerequisites: DSH (`@deepseek-ai/dsh`) and Node.js (≥20).
 
-**Option A (recommended, ecosystem standard)** — this plugin declares a `dsh.bundle` manifest, so install it with the official plugin command:
+**Option A (recommended, npm registry)** — the plugin is published to the npm registry as `dsh-undo-savepoint` and declares a `dsh.bundle` manifest, so a single command installs it:
+
+```bat
+dsh plugin --profile web add dsh-undo-savepoint
+```
+
+Restart DSH after installing. Snapshot directories and options are configurable in Settings.
+
+For manual mounting, you can also `npm install dsh-undo-savepoint` from your DSH install root (peer dependencies are provided by DSH, nothing extra to install):
+
+```bat
+npm install dsh-undo-savepoint
+```
+
+**Option A2 (GitHub direct)** — install the latest master commit without waiting for an npm sync:
 
 ```bat
 dsh plugin --profile web add github:lire1131/dsh-undo-savepoint#master
 ```
-
-Restart DSH after installing. Snapshot directories and options are configurable in Settings.
 
 **Option B (local source / pre-release)** — clone and mount manually:
 
@@ -188,8 +202,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-undo-savepoint-gu
 powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-undo-savepoint.ps1" list
 powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-undo-savepoint.ps1" snapshot -Label "reason"
 powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-undo-savepoint.ps1" undo
+powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-undo-savepoint.ps1" undo -SyncDeps
 powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-undo-savepoint.ps1" redo
 powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-undo-savepoint.ps1" restore -Id <id> -Force
+powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-undo-savepoint.ps1" restore -Id <id> -Force -SyncDeps
 powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-undo-savepoint.ps1" remove -Id <id>
 powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-undo-savepoint.ps1" prune -KeepAuto 20
 
@@ -206,9 +222,9 @@ Typical rescue scenario: **DSH fails to boot with something like `duplicate load
 | `GET /api/undo/status` | `{canUndo, canRedo, total}` |
 | `GET /api/undo/list` | Snapshot list (with location: manual/auto/legacy) |
 | `GET/POST /api/undo/settings` | Read/write save options (auto-save, debounce, keep count, dirs); POST applies immediately |
-| `POST /api/undo/undo` | Undo the last change |
-| `POST /api/undo/redo` | Redo the last undo |
-| `POST /api/undo/restore` | body `{id}` — restore to a fixed version |
+| `POST /api/undo/undo` | Undo the last change; optional body `{syncDeps: true}` rebuilds `node_modules` from the restored lockfile |
+| `POST /api/undo/redo` | Redo the last undo; optional body `{syncDeps: true}` |
+| `POST /api/undo/restore` | body `{id, syncDeps?}` — restore to a fixed version |
 | `POST /api/undo/remove` | body `{id}` — delete a snapshot |
 | `POST /api/undo/snapshot` | body `{reason}` — manual save |
 | `POST /api/undo/pick-dir` | Open the native folder picker, return the chosen path |
