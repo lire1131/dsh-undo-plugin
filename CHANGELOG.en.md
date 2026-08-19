@@ -9,7 +9,7 @@ Notable changes to dsh-undo-savepoint. Dates are in local time (UTC+8). 中文�
 - **Dependency reconciliation after restore**: when undo/redo/restore touches `package.json` / `pnpm-lock.yaml` / `pnpm-workspace.yaml`, the default result reports that `node_modules` may be out of sync and prints the rebuild command. An explicit sync runs `pnpm install --frozen-lockfile` (plain `pnpm install` without a lockfile); a failed install never rolls back the restored config files
 
 ### Improved
-- **README aligned with the npm release**: restored the `dsh plugin --profile web add dsh-undo-savepoint` / `npm install dsh-undo-savepoint` (way A) and GitHub direct install (way A2) docs, matching the published 0.3.5 npm package
+- **npm install removed from docs**: README no longer advertises the npm-registry install; install options are now GitHub direct (way A) and local source (way B)
 
 ### Entry points
 - Offline CLI: `dsh-undo.ps1 undo|redo|restore -SyncDeps`

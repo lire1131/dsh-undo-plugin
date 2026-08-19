@@ -9,7 +9,7 @@ dsh-undo-savepoint 的重要变更。日期为本地时间(UTC+8)。English vers
 - **恢复后对账依赖状态**：undo/redo/restore 触及 `package.json` / `pnpm-lock.yaml` / `pnpm-workspace.yaml` 时，默认报告 `node_modules` 可能不同步并给出重建命令；显式开启同步时执行 `pnpm install --frozen-lockfile`（无 lockfile 回退普通 `pnpm install`），安装失败不回滚已还原的配置文件
 
 ### 优化
-- **README 与 npm 发布版对齐**：恢复 `dsh plugin --profile web add dsh-undo-savepoint` / `npm install dsh-undo-savepoint`（方式 A）与 GitHub 直装（方式 A2）说明，与已发布到 npm 的 0.3.5 包一致
+- **移除 npm 安装方式**：README 删除 npm 发布版安装说明与 npm 安装地址，安装方式收敛为 GitHub 直装（方式 A）与本地源码（方式 B）
 
 ### 入口
 - 离线 CLI：`dsh-undo.ps1 undo|redo|restore -SyncDeps`
