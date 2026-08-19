@@ -1,13 +1,13 @@
-# dsh-undo-savepoint 鈥?Undo/rollback system for DSH
+# dsh-undo-savepoint — Undo/rollback system for DSH
 
-[![awesome 路 DSH plugin](https://awesome-dsh-plugin.com/badge.svg)](https://awesome-dsh-plugin.com)
+[![awesome · DSH plugin](https://awesome-dsh-plugin.com/badge.svg)](https://awesome-dsh-plugin.com)
 [![CI](https://github.com/lire1131/dsh-undo-savepoint/actions/workflows/ci.yml/badge.svg)](https://github.com/lire1131/dsh-undo-savepoint/actions/workflows/ci.yml)
 
-> English | [涓枃](README.md) | [Changelog](CHANGELOG.en.md)
+> English | [中文](README.md) | [Changelog](CHANGELOG.en.md)
 
 **DSH crash-rescue plugin: undo config & plugin-code changes, secret-safe snapshots, one-click SAFE MODE, plus offline CLI/GUI that work even when DSH won't boot.**
 
-An undo/rollback system for [DeepSeek Harness (DSH)](https://github.com/deepseek-ai/deepseek-harness): **every plugin install, skin switch or settings change is auto-snapshotted; manual saves whenever you want; one-click undo / redo / restore to any version** 鈥?plus offline CLI & GUI tools that still work even when DSH fails to boot.
+An undo/rollback system for [DeepSeek Harness (DSH)](https://github.com/deepseek-ai/deepseek-harness): **every plugin install, skin switch or settings change is auto-snapshotted; manual saves whenever you want; one-click undo / redo / restore to any version** — plus offline CLI & GUI tools that still work even when DSH fails to boot.
 
 ## Preview
 
@@ -15,7 +15,7 @@ An undo/rollback system for [DeepSeek Harness (DSH)](https://github.com/deepseek
 |---|
 | ![header](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/webui-header.png) |
 
-| WebUI snapshot manager (diff / restore / delete / clean-up / export / import / SAFE MODE) | WebUI Settings 鈥?own "Snapshots" section (sensitive mode / plugin whitelist / dir pickers) |
+| WebUI snapshot manager (diff / restore / delete / clean-up / export / import / SAFE MODE) | WebUI Settings — own "Snapshots" section (sensitive mode / plugin whitelist / dir pickers) |
 |---|---|
 | ![panel](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/webui-panel.png) | ![settings](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/webui-settings-section.png) |
 
@@ -31,14 +31,14 @@ An undo/rollback system for [DeepSeek Harness (DSH)](https://github.com/deepseek
 
 | Capability | What it does |
 |---|---|
-| **Config + plugin-code rollback** | Snapshots cover config files AND user-plugin code trees 鈥?any broken edit is undoable (incl. pure code incidents like the whale-kit `yield*` crash); undo / redo / restore-to-any-version from WebUI, chat or offline CLI |
-| **Secret redaction + local vault** | `.env` / credentials enter snapshots auto-redacted (structure preserved) 鈥?exported ZIPs are safe to share; real values live in a local vault, **local rollbacks restore them fully** |
+| **Config + plugin-code rollback** | Snapshots cover config files AND user-plugin code trees — any broken edit is undoable (incl. pure code incidents like the whale-kit `yield*` crash); undo / redo / restore-to-any-version from WebUI, chat or offline CLI |
+| **Secret redaction + local vault** | `.env` / credentials enter snapshots auto-redacted (structure preserved) — exported ZIPs are safe to share; real values live in a local vault, **local rollbacks restore them fully** |
 | **One-click SAFE MODE** | When DSH cannot boot at all, temporarily disables every user plugin except the undo system so it always boots; auto-snapshots + config backup on entry, one-click exit |
-| **Crash attribution** | After an abnormal exit, names the concrete last-known-good snapshot with a one-click rollback button 鈥?no guessing |
+| **Crash attribution** | After an abnormal exit, names the concrete last-known-good snapshot with a one-click rollback button — no guessing |
 | **Safe cross-machine migration** | Restore preflights missing plugins and warns clearly; snapshots export/import as one-click ZIP (see [docs/migration.en.md](docs/migration.en.md)) |
-| **Offline emergency kit** | CLI + GUI window + one-click desktop shortcut: undo / restore / SAFE MODE / crash banner / rollback log 鈥?everything works when DSH is down |
+| **Offline emergency kit** | CLI + GUI window + one-click desktop shortcut: undo / restore / SAFE MODE / crash banner / rollback log — everything works when DSH is down |
 
-> Basic capabilities (keyboard shortcuts, chat commands, auto-cleanup, dual save modes, configurable options, 鈥? are covered below and in the [Changelog](CHANGELOG.en.md).
+> Basic capabilities (keyboard shortcuts, chat commands, auto-cleanup, dual save modes, configurable options, …) are covered below and in the [Changelog](CHANGELOG.en.md).
 
 ## Crash rescue quick reference (pick by scenario)
 
@@ -47,7 +47,7 @@ An undo/rollback system for [DeepSeek Harness (DSH)](https://github.com/deepseek
 | Config/plugin mount broken | Chat / WebUI / CLI: `undo` or `restore -Id <id>` |
 | Plugin code broken | Same (snapshots include plugin code trees, one-click restore) |
 | Last run crashed, unsure what to roll back to | WebUI / GUI banner shows the last-known-good snapshot, one-click rollback |
-| **DSH will not boot at all** | Desktop "DSH Undo Manager" 鈫?**SAFE MODE** button (or CLI `safe-mode -Label on`) 鈫?restart DSH, it always boots |
+| **DSH will not boot at all** | Desktop "DSH Undo Manager" → **SAFE MODE** button (or CLI `safe-mode -Label on`) → restart DSH, it always boots |
 | Missing plugins after restore (cross-machine) | Preflight warning in the restore report; install first or use safe mode |
 | "My config suddenly changed" | CLI `recent` / chat `undo_recent` check the rollback log |
 | Rollback touched plugins/mounts | Report says "restart DSH for it to take effect" |
@@ -60,25 +60,25 @@ The snapshot captures DSH's 6 config files: `cordis.patch.yml`, `package.json`, 
 |---|---|---|
 | Manual store | `<snapshot root>\manual\` | Manual snapshots (never auto-pruned) |
 | Auto store | `<snapshot root>\auto\` | Auto snapshots, boot baselines, undo pre-restore snapshots (auto keeps latest 20) |
-| Legacy store | `<snapshot root>\` root | Old flat layout 鈥?still read, auto-migrated on startup |
+| Legacy store | `<snapshot root>\` root | Old flat layout — still read, auto-migrated on startup |
 
-> 鈿狅笍 Snapshots contain copies of `.env` etc. which may include secrets 鈥?do not share or push them.
+> ⚠️ Snapshots contain copies of `.env` etc. which may include secrets — do not share or push them.
 
 ## Multi-profile support (v0.3.3)
 
 The plugin detects the active DSH profile from the launch arguments (`dsh --profile mine` / `--profile=mine`; `dsh web` falls back to `web`) and works per profile:
 
-- **Config directory**: defaults to `$DSH_HOME/profiles/<current profile>` (DSH_HOME defaults to `~/.dsh`; previously hardcoded to `web` 鈥?under any other profile snapshots read the wrong files, the watcher missed changes, and restores wrote to the wrong place);
+- **Config directory**: defaults to `$DSH_HOME/profiles/<current profile>` (DSH_HOME defaults to `~/.dsh`; previously hardcoded to `web` — under any other profile snapshots read the wrong files, the watcher missed changes, and restores wrote to the wrong place);
 - **Snapshot stores**: default to `<snapshot root>/<current profile>/{auto,manual}` (per-profile isolation); if the scoped dir does not exist but the old flat store does, the flat store is used so legacy snapshots are never hidden;
 - **Provenance**: the manifest records a `profile` field and `undo_list` shows the current profile.
 
-Offline CLI/GUI cannot see the launch arguments 鈥?set the `DSH_UNDO_PROFILE` environment variable or `profileName` in settings (default `web`).
+Offline CLI/GUI cannot see the launch arguments — set the `DSH_UNDO_PROFILE` environment variable or `profileName` in settings (default `web`).
 
 Explicit configuration always wins: `profileDir` / `manualDir` / `autoDir` / `profileName` (config or settings).
 
 ## Custom DSH home support (v0.3.5, issue #6)
 
-The DSH data-home resolution matches the official launcher (`@deepseek-ai/dsh-home-paths`) exactly: **`$DSH_HOME` wins** (blank = unset; `~` / `~/` / `~\` prefixes supported), otherwise it falls back to `<user home>\.dsh`. The settings file (`$DSH_HOME\undo\settings.json`), default snapshot root (`$DSH_HOME\undo-snapshots`), profile dir (`$DSH_HOME\profiles\<profile>`), home root and plugin-discovery paths are all derived from it 鈥?third-party clients with a custom `DSH_HOME` no longer suffer the "two homes" split (settings written to `~/.dsh` while DSH actually uses `$DSH_HOME`), and custom directories survive restarts.
+The DSH data-home resolution matches the official launcher (`@deepseek-ai/dsh-home-paths`) exactly: **`$DSH_HOME` wins** (blank = unset; `~` / `~/` / `~\` prefixes supported), otherwise it falls back to `<user home>\.dsh`. The settings file (`$DSH_HOME\undo\settings.json`), default snapshot root (`$DSH_HOME\undo-snapshots`), profile dir (`$DSH_HOME\profiles\<profile>`), home root and plugin-discovery paths are all derived from it — third-party clients with a custom `DSH_HOME` no longer suffer the "two homes" split (settings written to `~/.dsh` while DSH actually uses `$DSH_HOME`), and custom directories survive restarts.
 
 Explicit overrides are preserved: `DSH_UNDO_SETTINGS` / `DSH_UNDO_ROOT` / `DSH_UNDO_EXPORT` (env vars) and the config keys `homeDir` / `profileDir` / `manualDir` / `autoDir` keep the highest precedence.
 
@@ -86,13 +86,13 @@ Explicit overrides are preserved: `DSH_UNDO_SETTINGS` / `DSH_UNDO_ROOT` / `DSH_U
 
 So the repository is easier to find on GitHub search & Explore, these topics are set on the repo:
 
-`deepseek-harness` 路 `dsh` 路 `dsh-plugin` 路 `undo` 路 `rollback` 路 `snapshot` 路 `crash-recovery` 路 `backup` 路 `windows` 路 `powershell`
+`deepseek-harness` · `dsh` · `dsh-plugin` · `undo` · `rollback` · `snapshot` · `crash-recovery` · `backup` · `windows` · `powershell`
 
 ## Installation
 
-Prerequisites: DSH (`@deepseek-ai/dsh`) and Node.js (鈮?0).
+Prerequisites: DSH (`@deepseek-ai/dsh`) and Node.js (≥20).
 
-**Option A (recommended, npm registry)** 鈥?the plugin is published to the npm registry as `dsh-undo-savepoint` and declares a `dsh.bundle` manifest, so a single command installs it:
+**Option A (recommended, npm registry)** — the plugin is published to the npm registry as `dsh-undo-savepoint` and declares a `dsh.bundle` manifest, so a single command installs it:
 
 ```bat
 dsh plugin --profile web add dsh-undo-savepoint
@@ -106,13 +106,13 @@ For manual mounting, you can also `npm install dsh-undo-savepoint` from your DSH
 npm install dsh-undo-savepoint
 ```
 
-**Option A2 (GitHub direct)** 鈥?install the latest master commit without waiting for an npm sync:
+**Option A2 (GitHub direct)** — install the latest master commit without waiting for an npm sync:
 
 ```bat
 dsh plugin --profile web add github:lire1131/dsh-undo-savepoint#master
 ```
 
-**Option B (local source / pre-release)** 鈥?clone and mount manually:
+**Option B (local source / pre-release)** — clone and mount manually:
 
 1. **Clone the repository** into a local plugins directory (an ASCII path is safer), e.g. `D:\dsh\plugins\dsh-undo-savepoint`:
 
@@ -138,18 +138,18 @@ mklink /J "<your-dsh-install>\node_modules\dsh-undo-savepoint" "D:\dsh\plugins\d
 
 4. **Activate**: saving hot-reloads the host part; refresh the page to see the header buttons and settings rows; restart DSH for full steady state (legacy flat snapshots migrate automatically).
 
-> Dependency note: the host plugin loads `@deepseek-ai/dsh-tools` via `createRequire('<dsh-install-root>/package.json')`. If DSH lives elsewhere, set the environment variable `DSH_ROOT=<dsh-install-root>` 鈥?no extra package installation needed.
+> Dependency note: the host plugin loads `@deepseek-ai/dsh-tools` via `createRequire('<dsh-install-root>/package.json')`. If DSH lives elsewhere, set the environment variable `DSH_ROOT=<dsh-install-root>` — no extra package installation needed.
 
 ## Where are the external tools? ("I installed it and cannot find it")
 
-The external undo tools (GUI window + CLI) are **not placed on the desktop** 鈥?they ship inside the plugin install directory:
+The external undo tools (GUI window + CLI) are **not placed on the desktop** — they ship inside the plugin install directory:
 
 | Install method | Tool location |
 |---|---|
 | Method A: `dsh plugin add` | `$DSH_HOME\profiles\web\node_modules\dsh-undo-savepoint\tools\` (DSH_HOME defaults to `%USERPROFILE%\.dsh`) |
 | Method B: clone + junction | your clone `...\dsh-undo-savepoint\tools\` |
 
-**One-click desktop shortcut (recommended 鈥?open the tools straight from the desktop afterwards):**
+**One-click desktop shortcut (recommended — open the tools straight from the desktop afterwards):**
 
 Double-click `tools\make-desktop-shortcut.bat` (it auto-locates the plugin directory) and a **DSH Undo Manager** icon appears on the desktop;
 or copy the whole block below into a PowerShell window and press Enter (no need to locate any file first):
@@ -164,7 +164,7 @@ if ($d) {
   $s.WorkingDirectory = Join-Path $d 'tools'
   $s.Save()
   Write-Host "Desktop shortcut created: $($s.FullName)"
-} else { Write-Host 'Plugin directory not found 鈥?install it first: dsh plugin --profile web add github:lire1131/dsh-undo-savepoint#master' }
+} else { Write-Host 'Plugin directory not found — install it first: dsh plugin --profile web add github:lire1131/dsh-undo-savepoint#master' }
 ```
 
 **Just want to open the tools folder:**
@@ -183,8 +183,8 @@ After that, double-click the desktop **DSH Undo Manager** icon to open the exter
 - **Manual save**: "Save" in the panel / tell the AI "save a snapshot" / CLI `snapshot`.
 - **Restore to a fixed version**: click "Restore to this" on a row in the panel; or tell the AI "restore to <id>"; or CLI `restore -Id <id>`.
 - **Delete a snapshot**: "Delete" in the panel; or CLI `remove -Id <id>`.
-- **Custom shortcuts**: Settings 鈫?General 鈫?Undo/Redo shortcut (click the box then press a combo; Backspace clears).
-- **Save options**: Settings 鈫?General 鈫?Snapshot Settings (auto-save toggle, debounce, keep count, two directories; the 馃搧 button opens the native folder picker).
+- **Custom shortcuts**: Settings → General → Undo/Redo shortcut (click the box then press a combo; Backspace clears).
+- **Save options**: Settings → General → Snapshot Settings (auto-save toggle, debounce, keep count, two directories; the 📁 button opens the native folder picker).
 
 ### Offline tools (works even when DSH won't boot)
 
@@ -209,7 +209,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-undo-savepoint.ps
 powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-plugin.ps1" add <package>
 ```
 
-Typical rescue scenario: **DSH fails to boot with something like `duplicate loader entry id`** 鈫?open "DSH Undo Manager", pick the snapshot from before the change 鈫?Restore 鈫?restart DSH. No reinstall, no lost sessions.
+Typical rescue scenario: **DSH fails to boot with something like `duplicate loader entry id`** → open "DSH Undo Manager", pick the snapshot from before the change → Restore → restart DSH. No reinstall, no lost sessions.
 
 ## REST API (backend of the WebUI)
 
@@ -220,9 +220,9 @@ Typical rescue scenario: **DSH fails to boot with something like `duplicate load
 | `GET/POST /api/undo/settings` | Read/write save options (auto-save, debounce, keep count, dirs); POST applies immediately |
 | `POST /api/undo/undo` | Undo the last change |
 | `POST /api/undo/redo` | Redo the last undo |
-| `POST /api/undo/restore` | body `{id}` 鈥?restore to a fixed version |
-| `POST /api/undo/remove` | body `{id}` 鈥?delete a snapshot |
-| `POST /api/undo/snapshot` | body `{reason}` 鈥?manual save |
+| `POST /api/undo/restore` | body `{id}` — restore to a fixed version |
+| `POST /api/undo/remove` | body `{id}` — delete a snapshot |
+| `POST /api/undo/snapshot` | body `{reason}` — manual save |
 | `POST /api/undo/pick-dir` | Open the native folder picker, return the chosen path |
 
 ## Design notes
