@@ -1,9 +1,20 @@
 // tools/smoke-test.mjs — offline smoke test of dsh-undo-savepoint logic (no DSH needed).
 // Run:  node tools/smoke-test.mjs
 process.env.DSH_ROOT = process.env.DSH_ROOT ?? 'C:/Users/yzf';
-import { mkdtemp, writeFile, readFile, mkdir, rm, readdir } from 'node:fs/promises';
+import { mkdtemp, writeFile, readFile, mkdir, rm as rmRaw, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { fileURLToPath } from 'node:url';
+
+// Windows 上 fs.rm 偶发 ENOTEMPTY（杀软/索引器短暂占用目录句柄），统一重试几次。
+// 对全部既有调用点生效，避免每个临时目录清理都写一遍重试。
+const rm = async (dir, opts) => {
+  let last;
+  for (let i = 0; i < 4; i++) {
+    try { await rmRaw(dir, opts); return; } catch (e) { last = e; await new Promise((r) => setTimeout(r, 150)); }
+  }
+  throw last;
+};
 
 const root = await mkdtemp(join(tmpdir(), 'dsh-undo-savepoint-test-'));
 const home = join(root, 'home');
@@ -44,6 +55,8 @@ const run = async (name, args) => {
 };
 const cur = async (f) => readFile(join(profile, f), 'utf8');
 const set = async (f, v) => writeFile(join(profile, f), v);
+// Windows 上 fs.rm 偶发 ENOTEMPTY（杀软/索引器短暂占用目录句柄），清理时重试几次
+const cleanup = async (dir) => rm(dir, { recursive: true, force: true });
 
 console.log('== 1. snapshot & list ==');
 let out = await run('undo_snapshot', { reason: 'known-good' });
@@ -744,6 +757,298 @@ let calls18 = '';
 try { calls18 = await readFile(marker18, 'utf8'); } catch { /* marker 未生成 -> 保持空串，走下方明确断言 */ }
 check(calls18.includes('install --frozen-lockfile'), 'sync ran pnpm install --frozen-lockfile');
 await rm(root18, { recursive: true, force: true });
+
+console.log('== 25. encoding audit: non-ASCII ps1/bat must carry UTF-8 BOM (issue #11) ==');
+const repoRoot = fileURLToPath(new URL('..', import.meta.url));
+const badEnc = [];
+const walkRepo = async (dir) => {
+  let entries;
+  try { entries = await readdir(dir, { withFileTypes: true }); } catch { return; }
+  for (const e of entries) {
+    if (e.name === 'node_modules' || e.name === '.git') continue;
+    const p = join(dir, e.name);
+    if (e.isDirectory()) await walkRepo(p);
+    else if (/\.(ps1|bat|cmd)$/i.test(e.name)) {
+      const buf = await readFile(p);
+      const hasBom = buf.length >= 3 && buf[0] === 0xEF && buf[1] === 0xBB && buf[2] === 0xBF;
+      const hasNonAscii = buf.some((b) => b > 127);
+      if (hasNonAscii && !hasBom) badEnc.push(p);
+    }
+  }
+};
+await walkRepo(repoRoot);
+check(badEnc.length === 0, `no non-ASCII ps1/bat without BOM (bad: ${badEnc.join('; ') || 'none'})`);
+
+console.log('== 26. R3: no-plugin snapshot stays tiny, totalBytes recorded & listed ==');
+const root19 = await mkdtemp(join(tmpdir(), 'dsh-undo-test19-'));
+const home19 = join(root19, 'home'), profile19 = join(root19, 'profile'), snap19 = join(root19, 'snaps');
+await mkdir(home19, { recursive: true }); await mkdir(profile19, { recursive: true });
+await writeFile(join(home19, 'settings.yaml'), 'model: x\n');
+await writeFile(join(profile19, 'cordis.patch.yml'), '# patch\n[]\n');
+await writeFile(join(profile19, 'package.json'), '{"name":"test","v":1}\n');
+const tools19 = new Map();
+const ctx19 = {
+  tools: { register: (t) => { tools19.set(t.name, t); return () => { }; } },
+  systemPrompt: { section: () => () => { } }, get: () => undefined,
+  effect: (fn) => { const d = fn(); return d ?? (() => { }); }, logger: { info: () => { }, warn: () => { } },
+};
+apply(ctx19, { manualDir: join(snap19, 'manual'), autoDir: join(snap19, 'auto'), homeDir: home19, profileDir: profile19, watch: false, pluginDirs: [] });
+await new Promise((r) => setTimeout(r, 300));
+const run19 = async (name, args) => (await tools19.get(name).execute(args, {}));
+await run19('undo_snapshot', { reason: 'tiny' });
+const m19dir = (await readdir(join(snap19, 'manual'))).find((d) => !d.startsWith('.'));
+const m19 = JSON.parse(await readFile(join(snap19, 'manual', m19dir, 'manifest.json'), 'utf8'));
+check(typeof m19.totalBytes === 'number' && m19.totalBytes < 100 * 1024, `no-plugin snapshot totalBytes < 100KB (got ${m19.totalBytes})`);
+const list19 = await run19('undo_list', {});
+check(/\d+ (B|KB|MB)\)/.test(list19), 'undo_list shows snapshot size');
+await cleanup(root19);
+
+console.log('== 27. safe mode: missing profile patch -> empty [] backup roundtrip (B1) ==');
+const root20 = await mkdtemp(join(tmpdir(), 'dsh-undo-test20-'));
+const home20 = join(root20, 'home'), profile20 = join(root20, 'profile'), snap20 = join(root20, 'snaps');
+await mkdir(home20, { recursive: true }); await mkdir(profile20, { recursive: true });
+await writeFile(join(home20, 'settings.yaml'), 'model: x\n');
+// 注意：profile 下故意不创建 cordis.patch.yml（patch 缺失场景）
+const tools20 = new Map();
+const ctx20 = {
+  tools: { register: (t) => { tools20.set(t.name, t); return () => { }; } },
+  systemPrompt: { section: () => () => { } }, get: () => undefined,
+  effect: (fn) => { const d = fn(); return d ?? (() => { }); }, logger: { info: () => { }, warn: () => { } },
+};
+apply(ctx20, { manualDir: join(snap20, 'manual'), autoDir: join(snap20, 'auto'), homeDir: home20, profileDir: profile20, watch: false, pluginDirs: [] });
+await new Promise((r) => setTimeout(r, 300));
+const run20 = async (name, args) => (await tools20.get(name).execute(args, {}));
+let out20 = await run20('undo_safe_mode', { action: 'on' });
+console.log('   ', out20.split('\n')[0]);
+check(out20.includes('Safe mode ON'), 'safe mode entered without existing patch');
+const st20 = JSON.parse(await readFile(join(snap20, 'auto', 'safe-mode.json'), 'utf8'));
+check(st20.active === true && !!st20.backup && !!st20.homeFingerprint, 'state recorded with backup + homeFingerprint');
+check((await readFile(st20.backup, 'utf8')).trim() === '[]', 'backup is empty [] when patch was missing');
+const patch20 = await readFile(join(profile20, 'cordis.patch.yml'), 'utf8');
+check(patch20.includes('SAFE MODE') && patch20.includes('dsh-undo-savepoint'), 'minimal patch written');
+out20 = await run20('undo_safe_mode', { action: 'off' });
+check(out20.includes('Safe mode OFF'), 'safe mode exits');
+check((await readFile(join(profile20, 'cordis.patch.yml'), 'utf8')).trim() === '[]', 'exit restores empty backup ([] semantics)');
+await cleanup(root20);
+
+console.log('== 28. safe mode: brand-new home (autoDir absent) roundtrip (B3) ==');
+const root21 = await mkdtemp(join(tmpdir(), 'dsh-undo-test21-'));
+const home21 = join(root21, 'home'), profile21 = join(root21, 'profile'), snap21 = join(root21, 'snaps');
+await mkdir(home21, { recursive: true }); await mkdir(profile21, { recursive: true });
+await writeFile(join(home21, 'settings.yaml'), 'model: x\n');
+const originalPatch21 = '# patch\n- insert:\n    - id: whale\n      name: dsh-whale-kit\n';
+await writeFile(join(profile21, 'cordis.patch.yml'), originalPatch21);
+const tools21 = new Map();
+const ctx21 = {
+  tools: { register: (t) => { tools21.set(t.name, t); return () => { }; } },
+  systemPrompt: { section: () => () => { } }, get: () => undefined,
+  effect: (fn) => { const d = fn(); return d ?? (() => { }); }, logger: { info: () => { }, warn: () => { } },
+};
+apply(ctx21, { manualDir: join(snap21, 'manual'), autoDir: join(snap21, 'auto'), homeDir: home21, profileDir: profile21, watch: false, pluginDirs: [] });
+await new Promise((r) => setTimeout(r, 300));
+const run21 = async (name, args) => (await tools21.get(name).execute(args, {}));
+let out21 = await run21('undo_safe_mode', { action: 'on' });
+check(out21.includes('Safe mode ON'), 'fresh home: safe mode entered (autoDir created on demand)');
+out21 = await run21('undo_safe_mode', { action: 'off' });
+check(out21.includes('Safe mode OFF'), 'fresh home: safe mode exits');
+check((await readFile(join(profile21, 'cordis.patch.yml'), 'utf8')) === originalPatch21, 'fresh home: patch restored byte-identical');
+await cleanup(root21);
+
+console.log('== 29. safe mode: dual-level patch backup/restore (home + profile, H3) ==');
+const root22 = await mkdtemp(join(tmpdir(), 'dsh-undo-test22-'));
+const home22 = join(root22, 'home'), profile22 = join(root22, 'profile'), snap22 = join(root22, 'snaps');
+await mkdir(home22, { recursive: true }); await mkdir(profile22, { recursive: true });
+await writeFile(join(home22, 'settings.yaml'), 'model: x\n');
+const homePatch22 = '# home\n- insert:\n    - id: home-whale\n      name: dsh-home-kit\n';
+const profilePatch22 = '# patch\n- insert:\n    - id: whale\n      name: dsh-whale-kit\n';
+await writeFile(join(home22, 'cordis.patch.yml'), homePatch22);
+await writeFile(join(profile22, 'cordis.patch.yml'), profilePatch22);
+const tools22 = new Map();
+const ctx22 = {
+  tools: { register: (t) => { tools22.set(t.name, t); return () => { }; } },
+  systemPrompt: { section: () => () => { } }, get: () => undefined,
+  effect: (fn) => { const d = fn(); return d ?? (() => { }); }, logger: { info: () => { }, warn: () => { } },
+};
+apply(ctx22, { manualDir: join(snap22, 'manual'), autoDir: join(snap22, 'auto'), homeDir: home22, profileDir: profile22, watch: false, pluginDirs: [] });
+await new Promise((r) => setTimeout(r, 300));
+const run22 = async (name, args) => (await tools22.get(name).execute(args, {}));
+let out22 = await run22('undo_safe_mode', { action: 'on' });
+check(out22.includes('Safe mode ON'), 'dual-level: safe mode entered');
+const st22 = JSON.parse(await readFile(join(snap22, 'auto', 'safe-mode.json'), 'utf8'));
+check(!!st22.homeBackup && (await readFile(st22.homeBackup, 'utf8')) === homePatch22, 'dual-level: home patch backed up');
+check(!(await readFile(join(home22, 'cordis.patch.yml'), 'utf8')).includes('dsh-home-kit'), 'dual-level: home patch minimized too');
+out22 = await run22('undo_safe_mode', { action: 'off' });
+check(out22.includes('Safe mode OFF'), 'dual-level: safe mode exits');
+check((await readFile(join(home22, 'cordis.patch.yml'), 'utf8')) === homePatch22, 'dual-level: home patch restored byte-identical');
+check((await readFile(join(profile22, 'cordis.patch.yml'), 'utf8')) === profilePatch22, 'dual-level: profile patch restored byte-identical');
+await cleanup(root22);
+
+console.log('== 30. safe mode: home fingerprint mismatch -> stale, treated OFF (B2/H5) ==');
+const root22b = await mkdtemp(join(tmpdir(), 'dsh-undo-test22b-'));
+const home22b = join(root22b, 'home'), home22b2 = join(root22b, 'home2'), profile22b = join(root22b, 'profile'), snap22b = join(root22b, 'snaps');
+await mkdir(home22b, { recursive: true }); await mkdir(home22b2, { recursive: true }); await mkdir(profile22b, { recursive: true });
+await writeFile(join(home22b, 'settings.yaml'), 'model: x\n');
+await writeFile(join(home22b2, 'settings.yaml'), 'model: x\n');
+await writeFile(join(profile22b, 'cordis.patch.yml'), '# patch\n[]\n');
+const tools22b = new Map();
+const ctx22b = {
+  tools: { register: (t) => { tools22b.set(t.name, t); return () => { }; } },
+  systemPrompt: { section: () => () => { } }, get: () => undefined,
+  effect: (fn) => { const d = fn(); return d ?? (() => { }); }, logger: { info: () => { }, warn: () => { } },
+};
+apply(ctx22b, { manualDir: join(snap22b, 'manual'), autoDir: join(snap22b, 'auto'), homeDir: home22b, profileDir: profile22b, watch: false, pluginDirs: [] });
+await new Promise((r) => setTimeout(r, 300));
+const run22b = async (name, args) => (await tools22b.get(name).execute(args, {}));
+await run22b('undo_safe_mode', { action: 'on' });
+// 模拟"换机/家目录迁移"：同一快照仓库，home 指向另一个目录 → 指纹必然不同
+const tools22b2 = new Map();
+const ctx22b2 = {
+  tools: { register: (t) => { tools22b2.set(t.name, t); return () => { }; } },
+  systemPrompt: { section: () => () => { } }, get: () => undefined,
+  effect: (fn) => { const d = fn(); return d ?? (() => { }); }, logger: { info: () => { }, warn: () => { } },
+};
+apply(ctx22b2, { manualDir: join(snap22b, 'manual'), autoDir: join(snap22b, 'auto'), homeDir: home22b2, profileDir: profile22b, watch: false, pluginDirs: [] });
+await new Promise((r) => setTimeout(r, 300));
+const run22b2 = async (name, args) => (await tools22b2.get(name).execute(args, {}));
+let out22b = await run22b2('undo_safe_mode', { action: 'status' });
+check(out22b.includes('OFF'), 'status treats mismatched home as OFF (stale)');
+out22b = await run22b2('undo_safe_mode', { action: 'off' });
+check(out22b.includes('stale'), 'exit reports stale state explicitly');
+await cleanup(root22b);
+
+console.log('== 31. safe mode: startup self-heal re-adds missing undo mount (H1) ==');
+const root22c = await mkdtemp(join(tmpdir(), 'dsh-undo-test22c-'));
+const home22c = join(root22c, 'home'), profile22c = join(root22c, 'profile'), snap22c = join(root22c, 'snaps');
+await mkdir(home22c, { recursive: true }); await mkdir(profile22c, { recursive: true });
+await writeFile(join(home22c, 'settings.yaml'), 'model: x\n');
+await writeFile(join(profile22c, 'cordis.patch.yml'), '# patch\n[]\n');
+const tools22c = new Map();
+const ctx22c = {
+  tools: { register: (t) => { tools22c.set(t.name, t); return () => { }; } },
+  systemPrompt: { section: () => () => { } }, get: () => undefined,
+  effect: (fn) => { const d = fn(); return d ?? (() => { }); }, logger: { info: () => { }, warn: () => { } },
+};
+apply(ctx22c, { manualDir: join(snap22c, 'manual'), autoDir: join(snap22c, 'auto'), homeDir: home22c, profileDir: profile22c, watch: false, pluginDirs: [] });
+await new Promise((r) => setTimeout(r, 300));
+const run22c = async (name, args) => (await tools22c.get(name).execute(args, {}));
+await run22c('undo_safe_mode', { action: 'on' });
+// 模拟 profile 初始化竞态（H1）：安全模式激活中，patch 被模板覆盖，undo 挂载丢失
+await writeFile(join(profile22c, 'cordis.patch.yml'), '# template\n[]\n');
+// 重新 apply（模拟 DSH 重启）→ 启动自愈应自动补回 undo 挂载
+const tools22c2 = new Map();
+const ctx22c2 = {
+  tools: { register: (t) => { tools22c2.set(t.name, t); return () => { }; } },
+  systemPrompt: { section: () => () => { } }, get: () => undefined,
+  effect: (fn) => { const d = fn(); return d ?? (() => { }); }, logger: { info: () => { }, warn: () => { } },
+};
+apply(ctx22c2, { manualDir: join(snap22c, 'manual'), autoDir: join(snap22c, 'auto'), homeDir: home22c, profileDir: profile22c, watch: false, pluginDirs: [] });
+await new Promise((r) => setTimeout(r, 400));
+check((await readFile(join(profile22c, 'cordis.patch.yml'), 'utf8')).includes('dsh-undo-savepoint'), 'startup self-heal re-ensured undo mount');
+await cleanup(root22c);
+
+console.log('== 32. R3: plugin tree beyond 5MB -> truncated flag, no crash ==');
+const root23 = await mkdtemp(join(tmpdir(), 'dsh-undo-test23-'));
+const home23 = join(root23, 'home'), profile23 = join(root23, 'profile'), snap23 = join(root23, 'snaps');
+const plugin23 = join(root23, 'plugins', 'big');
+await mkdir(home23, { recursive: true }); await mkdir(profile23, { recursive: true }); await mkdir(plugin23, { recursive: true });
+await writeFile(join(home23, 'settings.yaml'), 'model: x\n');
+await writeFile(join(profile23, 'cordis.patch.yml'), '# patch\n[]\n');
+await writeFile(join(profile23, 'package.json'), '{"name":"test","v":1}\n');
+// 22 × 256KB = 5.5MB > 5MB 上限（单文件 ≤256KB 不触发 too-large 跳过）
+const chunk = Buffer.alloc(256 * 1024, 0x61);
+for (let i = 0; i < 22; i++) await writeFile(join(plugin23, `f${i}.js`), chunk);
+const tools23 = new Map();
+const ctx23 = {
+  tools: { register: (t) => { tools23.set(t.name, t); return () => { }; } },
+  systemPrompt: { section: () => () => { } }, get: () => undefined,
+  effect: (fn) => { const d = fn(); return d ?? (() => { }); }, logger: { info: () => { }, warn: () => { } },
+};
+apply(ctx23, { manualDir: join(snap23, 'manual'), autoDir: join(snap23, 'auto'), homeDir: home23, profileDir: profile23, watch: false, pluginDirs: [plugin23] });
+await new Promise((r) => setTimeout(r, 400));
+const run23 = async (name, args) => (await tools23.get(name).execute(args, {}));
+await run23('undo_snapshot', { reason: 'big-plugin' });
+const m23dir = (await readdir(join(snap23, 'manual'))).find((d) => !d.startsWith('.'));
+const m23 = JSON.parse(await readFile(join(snap23, 'manual', m23dir, 'manifest.json'), 'utf8'));
+check((m23.plugins ?? []).some((p) => p.truncated === true), 'plugin tree truncated at 5MB (manifest flagged)');
+check(typeof m23.totalBytes === 'number' && m23.totalBytes > 0, 'totalBytes recorded for big snapshot');
+const list23 = await run23('undo_list', {});
+check(list23.includes('[truncated]'), 'undo_list marks truncated snapshot');
+await cleanup(root23);
+
+console.log('== 33. I12: duplicate mounts deduped at startup (bundle > profile patch > home patch) ==');
+// 场景 A：profile patch + home patch 双挂载 → 保留 profile patch，移除 home patch
+const root24 = await mkdtemp(join(tmpdir(), 'dsh-undo-test24-'));
+const home24 = join(root24, 'home'), profile24 = join(root24, 'profile'), snap24 = join(root24, 'snaps');
+await mkdir(home24, { recursive: true }); await mkdir(profile24, { recursive: true });
+await writeFile(join(home24, 'settings.yaml'), 'model: x\n');
+await writeFile(join(home24, 'cordis.patch.yml'), '# home\n- insert:\n    - id: dsh-undo-savepoint\n      name: dsh-undo-savepoint\n');
+await writeFile(join(profile24, 'cordis.patch.yml'), '# patch\n- insert:\n    - id: dsh-undo-savepoint\n      name: dsh-undo-savepoint\n');
+await writeFile(join(profile24, 'package.json'), '{"name":"test","v":1}\n');
+const tools24 = new Map();
+const ctx24 = {
+  tools: { register: (t) => { tools24.set(t.name, t); return () => { }; } },
+  systemPrompt: { section: () => () => { } }, get: () => undefined,
+  effect: (fn) => { const d = fn(); return d ?? (() => { }); }, logger: { info: () => { }, warn: () => { } },
+};
+apply(ctx24, { manualDir: join(snap24, 'manual'), autoDir: join(snap24, 'auto'), homeDir: home24, profileDir: profile24, watch: false, pluginDirs: [] });
+await new Promise((r) => setTimeout(r, 400));
+check((await readFile(join(profile24, 'cordis.patch.yml'), 'utf8')).includes('dsh-undo-savepoint'), 'dup A: profile patch mount kept');
+check(!(await readFile(join(home24, 'cordis.patch.yml'), 'utf8')).includes('dsh-undo-savepoint'), 'dup A: home patch duplicate removed');
+await cleanup(root24);
+// 场景 B：profile patch + bundles 双挂载 → 保留 bundle，移除 patch 挂载
+const root24b = await mkdtemp(join(tmpdir(), 'dsh-undo-test24b-'));
+const home24b = join(root24b, 'home'), profile24b = join(root24b, 'profile'), snap24b = join(root24b, 'snaps');
+await mkdir(home24b, { recursive: true }); await mkdir(profile24b, { recursive: true });
+await writeFile(join(home24b, 'settings.yaml'), 'model: x\n');
+await writeFile(join(profile24b, 'cordis.patch.yml'), '# patch\n- insert:\n    - id: dsh-undo-savepoint\n      name: dsh-undo-savepoint\n');
+await writeFile(join(profile24b, 'package.json'), JSON.stringify({ name: 'test', dsh: { profile: { bundles: ['dsh-undo-savepoint', 'dsh-other'] } } }));
+const tools24b = new Map();
+const ctx24b = {
+  tools: { register: (t) => { tools24b.set(t.name, t); return () => { }; } },
+  systemPrompt: { section: () => () => { } }, get: () => undefined,
+  effect: (fn) => { const d = fn(); return d ?? (() => { }); }, logger: { info: () => { }, warn: () => { } },
+};
+apply(ctx24b, { manualDir: join(snap24b, 'manual'), autoDir: join(snap24b, 'auto'), homeDir: home24b, profileDir: profile24b, watch: false, pluginDirs: [] });
+await new Promise((r) => setTimeout(r, 400));
+const pkg24b = JSON.parse(await readFile(join(profile24b, 'package.json'), 'utf8'));
+check((pkg24b.dsh?.profile?.bundles ?? []).includes('dsh-undo-savepoint') && (pkg24b.dsh?.profile?.bundles ?? []).includes('dsh-other'), 'dup B: bundle mount kept (others untouched)');
+check(!(await readFile(join(profile24b, 'cordis.patch.yml'), 'utf8')).includes('dsh-undo-savepoint'), 'dup B: patch duplicate removed');
+await cleanup(root24b);
+
+console.log('== 34. I12: duplicate tool registration warns; generic register error degrades (safeEffect) ==');
+const root25 = await mkdtemp(join(tmpdir(), 'dsh-undo-test25-'));
+const home25 = join(root25, 'home'), profile25 = join(root25, 'profile'), snap25 = join(root25, 'snaps');
+await mkdir(home25, { recursive: true }); await mkdir(profile25, { recursive: true });
+await writeFile(join(home25, 'settings.yaml'), 'model: x\n');
+await writeFile(join(profile25, 'cordis.patch.yml'), '# patch\n[]\n');
+await writeFile(join(profile25, 'package.json'), '{"name":"test","v":1}\n');
+const warns25 = [];
+const tools25 = new Map();
+tools25.set('undo_snapshot', { name: 'undo_snapshot', execute: async () => 'pre-registered by another mount' }); // 模拟另一挂载已注册
+const ctx25 = {
+  tools: { register: (t) => { if (tools25.has(t.name)) throw new Error('tool "' + t.name + '" is already registered'); tools25.set(t.name, t); return () => { }; } },
+  systemPrompt: { section: () => () => { } }, get: () => undefined,
+  effect: (fn) => { const d = fn(); return d ?? (() => { }); },
+  logger: { info: () => { }, warn: (...a) => warns25.push(a.join(' ')) },
+};
+apply(ctx25, { manualDir: join(snap25, 'manual'), autoDir: join(snap25, 'auto'), homeDir: home25, profileDir: profile25, watch: false, pluginDirs: [] });
+await new Promise((r) => setTimeout(r, 300));
+check(warns25.some((w) => w.includes('already registered')), 'duplicate tool registration warns + skips (startup survives)');
+check((await tools25.get('undo_snapshot').execute()).includes('pre-registered'), 'first mount wins; duplicate not overwritten');
+check(tools25.has('undo_list') && tools25.has('undo_restore'), 'other tools still registered');
+// 泛化抛错（非重复注册）：registerToolOnce 上抛 → safeEffect 捕获 → 降级继续
+const warns25b = [];
+const tools25b = new Map();
+const ctx25b = {
+  tools: { register: (t) => { throw new Error('boom: service unavailable'); } },
+  systemPrompt: { section: () => () => { } }, get: () => undefined,
+  effect: (fn) => { const d = fn(); return d ?? (() => { }); },
+  logger: { info: () => { }, warn: (...a) => warns25b.push(a.join(' ')) },
+};
+apply(ctx25b, { manualDir: join(snap25, 'manual'), autoDir: join(snap25, 'auto'), homeDir: home25, profileDir: profile25, watch: false, pluginDirs: [] });
+await new Promise((r) => setTimeout(r, 300));
+check(warns25b.some((w) => w.includes('degraded')), 'generic register error degrades with warning (safeEffect lid)');
+await cleanup(root25);
 
 await rm(root, { recursive: true, force: true });
 console.log(`\n== RESULT: ${pass} passed, ${fail} failed ==`);

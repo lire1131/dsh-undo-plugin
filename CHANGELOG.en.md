@@ -2,6 +2,30 @@
 
 Notable changes to dsh-undo-savepoint. Dates are in local time (UTC+8). 中文版:[CHANGELOG.md](CHANGELOG.md)
 
+## [0.3.7] - 2026-08-21
+
+### Fixed (emergency release)
+- **issue #11: desktop-shortcut script encoding**: `tools/make-desktop-shortcut.ps1` converted to UTF-8 with BOM (Windows PowerShell 5.x on a Chinese system parsed the BOM-less UTF-8 file as GBK, breaking string quotes → ParserError → shortcut creation failed). A new smoke encoding-audit case fails any non-ASCII `.ps1/.bat` without BOM, preventing regression
+- **Safe mode self-deletion / dangling-reference fixes (completing the 8/17 retro)**
+  - Empty-backup fallback: when the profile patch is missing on entry, the backup is written as `[]` (semantics: no user plugins to disable) instead of leaving a dangling reference that could never exit
+  - Invariant assertion: `active ⇒ every backup file exists`; entry is refused if the assertion fails
+  - Dual-level patches: the home-level `cordis.patch.yml` is now backed up/minimized/restored together with the profile one (previously safe mode only managed the profile patch, so plugins mounted at home level were unaffected)
+  - Home fingerprint: the state records a fingerprint (home root + profile + settings.yaml stats); a rebuilt home / machine switch degrades any leftover state to inactive with a warning, never carrying the old home's safe mode into the new home
+  - Startup self-heal: if the undo mount is missing while safe mode is active (profile-init race), it is re-ensured automatically at startup
+- **rc8 double-mount startup crash (2026-08-21 incident)**
+  - `dedupeMount` startup dedup: scans every mount source (bundles / profile patch incl. includes / home patch) and keeps only the canonical one (bundle > profile patch > home patch), backing up files to `.dsh-undo-bak` before touching them
+  - `registerToolOnce` registration guard: a duplicate tool registration only warns and skips — startup never dies
+  - The `safeEffect` rc8 compatibility lid (already in the working tree) is now part of the release
+
+### Improved
+- **5 MB per-snapshot budget (R3)**: `pluginMaxSnapshotBytes` 10 MB → 5 MB; manifests now record `totalBytes` (materialized size) and `undo_list` shows size plus a `[truncated]` marker. Over-budget snapshots keep the existing "manifest-only + warn, no data loss" behavior
+- **Tiny-snapshot guarantee**: new smoke assertion — a snapshot with no external plugins stays under 100 KB total
+
+### Tests
+- smoke 114 → 146 (+10 sections, +32 assertions): encoding audit, tiny snapshot + totalBytes, safe mode with missing patch, brand-new home roundtrip, dual-level patch backup/restore, home-fingerprint degradation, startup self-heal, 5 MB truncation, double-mount dedup (patch+patch / patch+bundle), duplicate-registration degradation + safeEffect lid
+- Cleanup robustness: `fs.rm` now retries on Windows' occasional ENOTEMPTY (AV/indexer briefly holding directory handles)
+- e2e 10/10 no regression; home-resolution 2 branches green; CI runs on windows-latest × node[20,22]
+
 ## [0.3.6] - 2026-08-20
 
 ### Fixed

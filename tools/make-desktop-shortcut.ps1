@@ -1,4 +1,4 @@
-# make-desktop-shortcut.ps1 — 在桌面一键创建「DSH 撤销管理器」快捷方式
+﻿# make-desktop-shortcut.ps1 — 在桌面一键创建「DSH 撤销管理器」快捷方式
 #
 # 用途：解决"装完插件找不到局外撤销工具"的问题。
 # 自动定位插件目录（按顺序）：

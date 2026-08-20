@@ -2,6 +2,30 @@
 
 dsh-undo-savepoint 的重要变更。日期为本地时间(UTC+8)。English version: [CHANGELOG.en.md](CHANGELOG.en.md)
 
+## [0.3.7] - 2026-08-21
+
+### 修复（紧急止血版）
+- **issue #11：快捷方式脚本编码事故**：`tools/make-desktop-shortcut.ps1` 转 UTF-8 with BOM（中文 Windows PowerShell 5.x 按 GBK 解析无 BOM 中文 → 引号被破坏 → ParserError，「DSH撤销管理器」桌面快捷方式创建失败）；新增 smoke 编码审计用例（含非 ASCII 的 `.ps1/.bat` 无 BOM 即 FAIL），杜绝回归
+- **安全模式自删/悬空修复（8/17 复盘补完）**：
+  - 空备份回退：进入时 profile patch 缺失 → 备份写 `[]`（语义=无用户插件可禁用），不再留下"引用从未创建的备份"死锁
+  - 不变量断言：`active ⇒ 备份文件真实存在`，进入侧断言失败拒绝写状态文件
+  - 双级 patch：home 级 `cordis.patch.yml` 一并备份/最小化/恢复（此前安全模式只动 profile 级，home 级挂载的插件完全不受控）
+  - home 指纹：状态记录 home 指纹（home 根 + profile + settings.yaml 统计），家目录重建/换机时残留状态自动降级为不激活并告警，绝不把旧家的安全模式带到新家
+  - 启动自愈：安全模式激活中若 undo 挂载丢失（profile 初始化竞态），启动时自动补挂载
+- **rc8 双重挂载启动即崩（2026-08-21 现场）**：
+  - 启动去重自愈 `dedupeMount`：扫描 bundle / profile patch（含 include 引用）/ home patch 全部挂载源，重复时只保留 canonical（bundle > profile patch > home patch），改动前先备份 `.dsh-undo-bak`
+  - 注册防御 `registerToolOnce`：重复注册只告警跳过，绝不炸掉启动
+  - `safeEffect` rc8 兼容盖子（工作区既有实现）随发布版合入
+
+### 优化
+- **单快照 ≤5MB 约束（任务书 R3）**：`pluginMaxSnapshotBytes` 10MB → 5MB；manifest 新增 `totalBytes`（快照物化体积），`undo_list` 展示体积与 `[truncated]` 标记；超限语义沿用"仅记清单+告警，不丢数据"
+- **快照精简固化**：新增 smoke 断言——无外部插件环境快照总字节 <100KB
+
+### 测试
+- smoke 114 → 146（新增 10 节 32 个断言）：编码审计、快照精简+totalBytes、patch 缺失进出安全模式、全新 home 往返、双级 patch 备份恢复、home 指纹降级、启动自愈、5MB 截断、双重挂载去重（patch+patch / patch+bundle 两场景）、重复注册降级与 safeEffect 兜底
+- 清理健壮性：`fs.rm` 统一加重试（Windows 杀软/索引器短暂占用目录句柄会偶发 ENOTEMPTY）
+- e2e 10/10 无回归；home-resolution 2 分支全绿；CI 在 windows-latest × node[20,22] 上执行
+
 ## [0.3.6] - 2026-08-20
 
 ### 修复

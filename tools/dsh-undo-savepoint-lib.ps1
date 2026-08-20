@@ -272,10 +272,23 @@ function Read-UndoVault([string]$Hash) {
     return $null
 }
 
-# ── SAFE MODE (v0.3, module 4): disable all user plugins except undo ──────
-# State file: <autoDir>/safe-mode.json. Entering backs up cordis.patch.yml and
-# writes a minimal patch; exiting restores the backup. Works OFFLINE (when DSH
-# cannot boot at all: dsh-undo.ps1 safe-mode -Label on still works).
+# ── SAFE MODE (v0.3, module 4; v0.3.7 补完 R5/B1/B2，与 lib/index.js 同步) ──
+# State file: <autoDir>/safe-mode.json. Entering backs up profile+home 两级
+# cordis.patch.yml and writes a minimal patch; exiting restores the backups.
+# patch 缺失时写空备份 []（语义=无用户插件可禁用），杜绝"引用从未创建的备份"
+# 死锁。不变量：active ⇒ 全部 backup 文件真实存在，进入侧断言失败拒绝写状态。
+# Works OFFLINE (when DSH cannot boot at all: dsh-undo.ps1 safe-mode -Label on).
+function Get-UndoHomeFingerprint {
+    # 与 JS 端 homeFingerprint 同规则：home 根 + profile 名的哈希；换家目录/换机
+    # → 路径变化 → 残留状态降级不激活。刻意不含 settings.yaml 统计：安全模式
+    # 期间正常改设置不应让状态"失效"。
+    $marker = "$script:UndoHomeRoot|$script:UndoProfileName"
+    $sha = [System.Security.Cryptography.SHA1]::Create()
+    try {
+        $bytes = [System.Text.Encoding]::UTF8.GetBytes($marker)
+        return ([BitConverter]::ToString($sha.ComputeHash($bytes))).Replace('-', '').ToLowerInvariant()
+    } finally { $sha.Dispose() }
+}
 function Get-UndoSafeModeState {
     $settings = Get-UndoSettings
     $stateFile = Join-Path $settings.autoDir 'safe-mode.json'
@@ -283,31 +296,65 @@ function Get-UndoSafeModeState {
     if (Test-Path -LiteralPath $stateFile) {
         try { $st = Get-Content -LiteralPath $stateFile -Raw -Encoding UTF8 | ConvertFrom-Json } catch { }
     }
+    # 残留状态识别（B2/H5）：指纹不匹配 → 降级为"不激活 + stale"（不删文件不静默）
+    if ($st.active -and $st.homeFingerprint -and ($st.homeFingerprint -ne (Get-UndoHomeFingerprint))) {
+        $st | Add-Member -NotePropertyName active -NotePropertyValue $false -Force
+        $st | Add-Member -NotePropertyName stale -NotePropertyValue $true -Force
+    }
     return $st
 }
 
 function Set-UndoSafeMode([bool]$On) {
     $settings = Get-UndoSettings
     $patch = Join-Path $script:UndoProfileRoot 'cordis.patch.yml'
+    $homePatch = Join-Path $script:UndoHomeRoot 'cordis.patch.yml'
     $stateFile = Join-Path $settings.autoDir 'safe-mode.json'
     $st = Get-UndoSafeModeState
     if ($On) {
         if ($st.active) { return @{ ok = $true; active = $true; message = "Safe mode is already ON (entered $($st.enteredAt))." } }
         $snap = New-UndoSnapshot 'manual' 'safe-mode-before'
         $backup = Join-Path $settings.autoDir "safe-mode-backup-$($snap.id).yml"
+        $homeBackup = Join-Path $settings.autoDir "safe-mode-home-backup-$($snap.id).yml"
+        # 目录先于文件（8/17 B1）：备份写进 autoDir，先确保目录存在
+        New-Item -ItemType Directory -Force -Path $settings.autoDir | Out-Null
+        # 空备份回退（B1 补完）：patch 缺失时写 []，而不是留下"从未创建的备份引用"
         if (Test-Path -LiteralPath $patch) { Copy-Item -LiteralPath $patch -Destination $backup -Force }
+        else { [System.IO.File]::WriteAllText($backup, "[]`n", (New-Object System.Text.UTF8Encoding($false))) }
+        # 双级 patch（H3）：home 级挂载的插件同样备份
+        $homePatchExists = Test-Path -LiteralPath $homePatch
+        if ($homePatchExists) { Copy-Item -LiteralPath $homePatch -Destination $homeBackup -Force }
+        # 不变量断言：备份必须真实存在才允许进入（进入侧补齐，退出侧原有检查保留）
+        if (-not (Test-Path -LiteralPath $backup)) {
+            return @{ ok = $false; error = "Safe-mode backup write failed ($backup). Refusing to enter safe mode." }
+        }
         $minimal = "# dsh-undo-savepoint SAFE MODE (entered $(Get-Date -Format o))`n# All user plugins except dsh-undo-savepoint are temporarily disabled.`n- insert:`n    - id: dsh-undo-savepoint`n      name: dsh-undo-savepoint`n"
         [System.IO.File]::WriteAllText($patch, $minimal, (New-Object System.Text.UTF8Encoding($false)))
-        New-Item -ItemType Directory -Force -Path $settings.autoDir | Out-Null
-        $stJson = @{ active = $true; enteredAt = (Get-Date).ToUniversalTime().ToString('o'); backup = $backup; snapshotId = $snap.id } | ConvertTo-Json -Depth 5
+        # 双级最小化：home 级 patch 同样清空（写 []），home 级挂载的插件一并禁用
+        if ($homePatchExists) {
+            [System.IO.File]::WriteAllText($homePatch, "# dsh-undo-savepoint SAFE MODE (home level, entered $(Get-Date -Format o))`n[]`n", (New-Object System.Text.UTF8Encoding($false)))
+        }
+        $stObj = @{ active = $true; enteredAt = (Get-Date).ToUniversalTime().ToString('o'); backup = $backup; snapshotId = $snap.id }
+        if ($homePatchExists) { $stObj.homeBackup = $homeBackup }
+        $stObj.homeFingerprint = Get-UndoHomeFingerprint
+        $stJson = $stObj | ConvertTo-Json -Depth 5
         [System.IO.File]::WriteAllText($stateFile, $stJson, (New-Object System.Text.UTF8Encoding($false)))
         return @{ ok = $true; active = $true; snapshotId = $snap.id; message = "Safe mode ON (pre-snapshot $($snap.id)). Restart DSH to boot with only dsh-undo-savepoint." }
     }
-    if (-not $st.active) { return @{ ok = $true; active = $false; message = 'Safe mode is not active.' } }
+    if (-not $st.active) {
+        if ($st.stale) {
+            return @{ ok = $true; active = $false; message = 'Safe mode state belongs to another home/profile (stale); treated as OFF. You can enter safe mode again for the current home.' }
+        }
+        return @{ ok = $true; active = $false; message = 'Safe mode is not active.' }
+    }
+    # 先校验全部备份在位，再动任何文件（避免恢复一半才发现缺备份）
     if (-not $st.backup -or -not (Test-Path -LiteralPath $st.backup)) {
         return @{ ok = $false; error = 'Safe-mode backup missing. Restore a snapshot from before the crash first (dsh-undo.ps1 list / restore).' }
     }
+    if ($st.homeBackup -and -not (Test-Path -LiteralPath $st.homeBackup)) {
+        return @{ ok = $false; error = 'Safe-mode home backup missing. Restore a snapshot from before the crash first (dsh-undo.ps1 list / restore).' }
+    }
     Copy-Item -LiteralPath $st.backup -Destination $patch -Force
+    if ($st.homeBackup) { Copy-Item -LiteralPath $st.homeBackup -Destination $homePatch -Force }
     Remove-Item -LiteralPath $stateFile -Force -ErrorAction SilentlyContinue
     return @{ ok = $true; active = $false; message = 'Safe mode OFF. Restart DSH to load all plugins again.' }
 }

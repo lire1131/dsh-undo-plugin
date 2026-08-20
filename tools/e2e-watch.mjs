@@ -5,9 +5,18 @@
 //   3. redo then succeeds (would have been blocked before the fix)
 // Run:  node tools/e2e-watch.mjs
 process.env.DSH_ROOT = process.env.DSH_ROOT ?? 'C:/Users/yzf';
-import { mkdtemp, writeFile, readFile, mkdir, rm } from 'node:fs/promises';
+import { mkdtemp, writeFile, readFile, mkdir, rm as rmRaw } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+
+// Windows 上 fs.rm 偶发 ENOTEMPTY（杀软/索引器短暂占用目录句柄），统一重试几次
+const rm = async (dir, opts) => {
+  let last;
+  for (let i = 0; i < 4; i++) {
+    try { await rmRaw(dir, opts); return; } catch (e) { last = e; await new Promise((r) => setTimeout(r, 150)); }
+  }
+  throw last;
+};
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
