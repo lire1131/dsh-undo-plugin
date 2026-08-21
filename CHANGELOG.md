@@ -2,6 +2,23 @@
 
 dsh-undo-savepoint 的重要变更。日期为本地时间(UTC+8)。English version: [CHANGELOG.en.md](CHANGELOG.en.md)
 
+## [0.3.8] - 2026-08-21
+
+### 新功能（安全模式 2.0，升级规划 R2+P1+B4+B5+B6）
+
+- **P1 · 安全模式 bundle 中和**：安全模式此前只最小化 patch 层，对「profile bundles 硬校验失败导致 DSH 起不来」完全无效。现进入安全模式时用与 dsh-app-boot `loadProfile` 相同的三项规则（可解析 / 有 `dsh.bundle.patch` / patch 文件存在）逐项校验 `dsh.profile.bundles`，剔除坏条目写回（原 `package.json` 双保险：快照 + 独立备份 `safe-mode-pkg-<id>.json`）；退出时整份恢复，消息报告中和条目数。边界：`package.json` 缺失跳过不阻断；JSON 损坏拒绝进入且绝不破坏性重写。幂等重扫：已在安全模式中再次 `on` 时只重扫报告，不重复写
+- **B5 · 崩溃归因 v2（crashReason）**：上次崩溃后启动时扫描日志尾部匹配已知签名，把崩溃分类为 `session-corrupt`（会话文件损坏）/ `bundle-check`（bundles 硬校验失败）/ `patch-tree`（插件挂载/加载失败）/ `unknown`，写入 `boot-state.json`（下次启动直接复用，日志滚动不丢归因）；`undo_list` 崩溃横幅按分类给出处置建议（会话损坏→`undo_scan`，bundle→进安全模式），`/api/undo/status` 返回 `crashReason` 字段
+- **B6 · `undo_scan` 会话健康扫描与修复**：扫描 `<home>/sessions/**/session.jsonl.zstd`，判定 `ok` / `fixable`（单帧布局违规，8/18 崩溃根因）/ `corrupt`（无法解码 / 首行非法 header / 坏 JSON 行）；`quarantine=true` 时修复 `fixable` 文件——原件复制到 `<undo 根>/corrupt-quarantine/` 并留 `.bak`，重编码为「header 独立帧 + 事件帧」并做三重校验（round-trip 文本一致 / 逐行 JSON / 重分析）后替换；`corrupt` 文件只隔离复制、绝不动原件。配套：`dsh-undo.ps1 scan [--fix] [-Label <home>]` 与离线脚本 `tools/session-scan.mjs`（DSH 起不来时也能用）
+- **B4 · dsh-session-persistence-jsonl 补丁托管**：3 处容错补丁（`appendBatch` 自愈 / `listArtifacts` 隔离 / `readFirstZstdLine` 宽容）以 `tools/dsh-patches.json` 清单托管（old = rc8 原始代码，new = rc6 已验证补丁）；`tools/apply-dsh-patches.ps1 status|verify|apply|remove` 离线应用/还原（逐补丁备份 `.bak-<id>`，未知状态中止不写）；插件启动时只读校验并告警（绝不自动改文件），进入安全模式时附带提示
+
+### 优化
+- `undo_safe_mode` 工具描述与 WebUI 确认文案同步 v0.3.8 能力（bundle 中和）
+
+### 测试
+- smoke 146 → 174（新增 5 节 28 个断言）：P1 bundle 中和往返 + 损坏 package.json 拒绝进入、B5 日志签名分类（session-corrupt / bundle-check 两场景）、B6 扫描/修复/隔离/复扫、补丁清单 old/new 与真实 rc8/rc6 目标精确匹配
+- 修复：编辑后的 `.ps1` 文件重新携带 UTF-8 BOM（用例 25 编码审计回归校验）
+- 收尾验证：smoke 174 全绿；e2e 10/10 无回归；home-resolution 2 分支全绿
+
 ## [0.3.7] - 2026-08-21
 
 ### 修复（紧急止血版）

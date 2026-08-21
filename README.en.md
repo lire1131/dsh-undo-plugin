@@ -33,8 +33,9 @@ An undo/rollback system for [DeepSeek Harness (DSH)](https://github.com/deepseek
 |---|---|
 | **Config + plugin-code rollback** | Snapshots cover config files AND user-plugin code trees — any broken edit is undoable (incl. pure code incidents like the whale-kit `yield*` crash); undo / redo / restore-to-any-version from WebUI, chat or offline CLI |
 | **Secret redaction + local vault** | `.env` / credentials enter snapshots auto-redacted (structure preserved) — exported ZIPs are safe to share; real values live in a local vault, **local rollbacks restore them fully** |
-| **One-click SAFE MODE** | When DSH cannot boot at all, temporarily disables every user plugin except the undo system so it always boots; auto-snapshots + config backup on entry, one-click exit |
-| **Crash attribution** | After an abnormal exit, names the concrete last-known-good snapshot with a one-click rollback button — no guessing |
+| **One-click SAFE MODE** | When DSH cannot boot at all, temporarily disables every user plugin except the undo system so it always boots; auto-snapshots + config backup on entry, one-click exit (v0.3.7+: profile/home dual-level patches backed up & restored, empty-backup `[]` fallback, stale-state downgrade on home rebuild; **v0.3.8+: also neutralizes `dsh.profile.bundles` entries that would fail the boot loader's hard checks — original `package.json` backed up separately and fully restored on exit**) |
+| **Crash attribution** | After an abnormal exit, names the concrete last-known-good snapshot with a one-click rollback button — no guessing (**v0.3.8+: classifies the crash by log signature — `session-corrupt` / `bundle-check` / `patch-tree` — and the banner suggests the matching remedy**) |
+| **Session-file scan & repair** | `undo_scan` scans `<home>/sessions/**/session.jsonl.zstd`: single-frame layout violations (the 8/18 crash root cause) are recoded in place (original kept as `.bak` + quarantine copy) with triple verification; undecodable files are only isolated, never touched. Offline via `dsh-undo.ps1 scan [--fix]` |
 | **Safe cross-machine migration** | Restore preflights missing plugins and warns clearly; snapshots export/import as one-click ZIP (see [docs/migration.en.md](docs/migration.en.md)) |
 | **Offline emergency kit** | CLI + GUI window + one-click desktop shortcut: undo / restore / SAFE MODE / crash banner / rollback log — everything works when DSH is down |
 
@@ -48,6 +49,7 @@ An undo/rollback system for [DeepSeek Harness (DSH)](https://github.com/deepseek
 | Plugin code broken | Same (snapshots include plugin code trees, one-click restore) |
 | Last run crashed, unsure what to roll back to | WebUI / GUI banner shows the last-known-good snapshot, one-click rollback |
 | **DSH will not boot at all** | Desktop "DSH Undo Manager" → **SAFE MODE** button (or CLI `safe-mode -Label on`) → restart DSH, it always boots |
+| Crash banner says session damage | Chat / CLI: `undo_scan quarantine=true` (or offline `dsh-undo.ps1 scan --fix`) |
 | Missing plugins after restore (cross-machine) | Preflight warning in the restore report; install first or use safe mode |
 | "My config suddenly changed" | CLI `recent` / chat `undo_recent` check the rollback log |
 | Rollback touched plugins/mounts | Report says "restart DSH for it to take effect" |
@@ -229,6 +231,6 @@ Typical rescue scenario: **DSH fails to boot with something like `duplicate load
 - Tests (no DSH needed; run in the repository directory):
 
 ```bat
-node tools\smoke-test.mjs     :: 114 logic tests (snapshot/undo/redo/store split/no-change hint)
+node tools\smoke-test.mjs     :: 174 logic tests (snapshot/undo/redo/store split/no-change hint)
 node tools\e2e-watch.mjs      :: 10 real-timing regressions (auto-save/undo-no-harm/redo)
 ```

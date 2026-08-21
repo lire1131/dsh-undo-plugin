@@ -304,17 +304,67 @@ function Get-UndoSafeModeState {
     return $st
 }
 
+# ── P1 bundle 层中和（v0.3.8，与 lib/index.js 同步）──────────────────────────
+# DSH 启动器对 dsh.profile.bundles 每项做三项硬校验（解析不到 / 缺
+# dsh.bundle.patch / patch 文件缺失），任一失败整个 DSH 起不来；安全模式若只
+# 最小化 patch 层则完全无效。进入时把坏条目临时剔除，退出时整份恢复。
+function Test-UndoBundleResolvable([string]$Name) {
+    # 与 dsh-app-boot resolveBundleDir 等价：home 链 + profile 链的 node_modules
+    # 搜索，取第一个含 package.json 的目录（含 @scope 目录），逐项做三项校验。
+    foreach ($root in @($script:UndoHomeRoot, $script:UndoProfileRoot)) {
+        $cand = Join-Path (Join-Path $root 'node_modules') $Name
+        $pkgFile = Join-Path $cand 'package.json'
+        if (-not (Test-Path -LiteralPath $pkgFile)) { continue }
+        try { $pkg = Get-Content -LiteralPath $pkgFile -Raw -Encoding UTF8 | ConvertFrom-Json } catch { continue }
+        $patch = $pkg.dsh.bundle.patch
+        if (-not $patch) { return @{ ok = $false; reason = "no dsh.bundle.patch ($Name)" } }
+        if (-not (Test-Path -LiteralPath (Join-Path $cand $patch))) { return @{ ok = $false; reason = "patch 文件缺失: $patch" } }
+        return @{ ok = $true }
+    }
+    return @{ ok = $false; reason = "cannot resolve $Name" }
+}
+function Get-UndoSafeBundles {
+    # 计算"安全 bundles"：只剔除坏项、保留顺序；dependencies 里的 link: 条目不动。
+    # 注意 ConvertFrom-Json 对单元素数组会降级为标量——统一 @() 包裹再遍历。
+    $pkgPath = Join-Path $script:UndoProfileRoot 'package.json'
+    if (-not (Test-Path -LiteralPath $pkgPath)) { return @{ pruned = @(); kept = @() } }
+    try { $pkg = Get-Content -LiteralPath $pkgPath -Raw -Encoding UTF8 | ConvertFrom-Json } catch { throw "profile package.json 解析失败: $_" }
+    $bundles = @($pkg.dsh.profile.bundles)
+    if ($bundles.Count -eq 0 -or $null -eq $bundles[0]) { return @{ pruned = @(); kept = @() } }
+    $pruned = @(); $kept = @()
+    foreach ($name in $bundles) {
+        $r = Test-UndoBundleResolvable ([string]$name)
+        if ($r.ok) { $kept += $name } else { $pruned += @{ name = $name; reason = $r.reason } }
+    }
+    return @{ pruned = $pruned; kept = $kept }
+}
+
 function Set-UndoSafeMode([bool]$On) {
     $settings = Get-UndoSettings
     $patch = Join-Path $script:UndoProfileRoot 'cordis.patch.yml'
     $homePatch = Join-Path $script:UndoHomeRoot 'cordis.patch.yml'
+    $pkgPath = Join-Path $script:UndoProfileRoot 'package.json'
     $stateFile = Join-Path $settings.autoDir 'safe-mode.json'
     $st = Get-UndoSafeModeState
     if ($On) {
-        if ($st.active) { return @{ ok = $true; active = $true; message = "Safe mode is already ON (entered $($st.enteredAt))." } }
+        # 幂等 + 重扫（P1）：进入后用户可能手动改坏 bundles，重扫只报告不重复写
+        if ($st.active) {
+            $rescanned = @()
+            if (Test-Path -LiteralPath $pkgPath) {
+                try {
+                    $null = Get-Content -LiteralPath $pkgPath -Raw -Encoding UTF8 | ConvertFrom-Json
+                    $rescanned = @((Get-UndoSafeBundles).pruned)
+                } catch { }
+            }
+            $rescanTxt = if ($rescanned.Count -gt 0) {
+                " 重扫发现 $($rescanned.Count) 个会崩溃的 bundle 条目：$((@($rescanned | ForEach-Object { $_.name })) -join ', ')。"
+            } else { ' 重扫未发现新的坏 bundle 条目。' }
+            return @{ ok = $true; active = $true; message = "Safe mode is already ON (entered $($st.enteredAt)).$rescanTxt" }
+        }
         $snap = New-UndoSnapshot 'manual' 'safe-mode-before'
         $backup = Join-Path $settings.autoDir "safe-mode-backup-$($snap.id).yml"
         $homeBackup = Join-Path $settings.autoDir "safe-mode-home-backup-$($snap.id).yml"
+        $pkgBackup = Join-Path $settings.autoDir "safe-mode-pkg-$($snap.id).json"
         # 目录先于文件（8/17 B1）：备份写进 autoDir，先确保目录存在
         New-Item -ItemType Directory -Force -Path $settings.autoDir | Out-Null
         # 空备份回退（B1 补完）：patch 缺失时写 []，而不是留下"从未创建的备份引用"
@@ -327,6 +377,35 @@ function Set-UndoSafeMode([bool]$On) {
         if (-not (Test-Path -LiteralPath $backup)) {
             return @{ ok = $false; error = "Safe-mode backup write failed ($backup). Refusing to enter safe mode." }
         }
+        # P1 bundle 中和：备份原 package.json（双保险：快照 + 独立备份文件）→
+        # 用与 dsh-app-boot loadProfile 同规则校验每个 bundle 条目 → 剔除坏项
+        # 写回。边界：package.json 缺失 → 跳过不阻断；JSON 损坏 → 不破坏性
+        # 重写（数据优先），返回错误引导先恢复快照。
+        $prunedBundles = @()
+        $pkgBackedUp = $false
+        if (Test-Path -LiteralPath $pkgPath) {
+            $pkgRaw = Get-Content -LiteralPath $pkgPath -Raw -Encoding UTF8
+            [System.IO.File]::WriteAllText($pkgBackup, $pkgRaw, (New-Object System.Text.UTF8Encoding($false)))
+            $pkgBackedUp = $true
+            try {
+                $pkg = $pkgRaw | ConvertFrom-Json
+                $safe = Get-UndoSafeBundles
+                $prunedBundles = @($safe.pruned)
+                $keptStr = (@($safe.kept) -join "`u{0}")
+                $origBundles = @($pkg.dsh.profile.bundles)
+                $origStr = (@($origBundles) -join "`u{0}")
+                if ($keptStr -ne $origStr) {
+                    if ($null -eq $pkg.dsh) { $pkg | Add-Member -NotePropertyName dsh -NotePropertyValue @{} -Force }
+                    if ($null -eq $pkg.dsh.profile) { $pkg.dsh | Add-Member -NotePropertyName profile -NotePropertyValue @{} -Force }
+                    # ConvertTo-Json 对单元素数组会丢数组形态 → 一元数组包裹
+                    $pkg.dsh.profile | Add-Member -NotePropertyName bundles -NotePropertyValue (,@($safe.kept)) -Force
+                    $outJson = $pkg | ConvertTo-Json -Depth 8
+                    [System.IO.File]::WriteAllText($pkgPath, $outJson + "`n", (New-Object System.Text.UTF8Encoding($false)))
+                }
+            } catch {
+                return @{ ok = $false; error = "profile package.json 解析失败，未执行 bundle 中和: $_; 请先用 dsh-undo.ps1 restore 恢复快照。" }
+            }
+        }
         $minimal = "# dsh-undo-savepoint SAFE MODE (entered $(Get-Date -Format o))`n# All user plugins except dsh-undo-savepoint are temporarily disabled.`n- insert:`n    - id: dsh-undo-savepoint`n      name: dsh-undo-savepoint`n"
         [System.IO.File]::WriteAllText($patch, $minimal, (New-Object System.Text.UTF8Encoding($false)))
         # 双级最小化：home 级 patch 同样清空（写 []），home 级挂载的插件一并禁用
@@ -336,9 +415,16 @@ function Set-UndoSafeMode([bool]$On) {
         $stObj = @{ active = $true; enteredAt = (Get-Date).ToUniversalTime().ToString('o'); backup = $backup; snapshotId = $snap.id }
         if ($homePatchExists) { $stObj.homeBackup = $homeBackup }
         $stObj.homeFingerprint = Get-UndoHomeFingerprint
-        $stJson = $stObj | ConvertTo-Json -Depth 5
+        if ($pkgBackedUp) { $stObj.pkgBackup = $pkgBackup }
+        if ($prunedBundles.Count -gt 0) { $stObj.prunedBundles = ,@($prunedBundles) }
+        $stJson = $stObj | ConvertTo-Json -Depth 6
         [System.IO.File]::WriteAllText($stateFile, $stJson, (New-Object System.Text.UTF8Encoding($false)))
-        return @{ ok = $true; active = $true; snapshotId = $snap.id; message = "Safe mode ON (pre-snapshot $($snap.id)). Restart DSH to boot with only dsh-undo-savepoint." }
+        $prunedTxt = ''
+        if ($prunedBundles.Count -gt 0) {
+            $parts = @($prunedBundles | ForEach-Object { "$($_.name)（$($_.reason)）" })
+            $prunedTxt = " 中和 $($prunedBundles.Count) 个会崩溃的 bundle 条目：$($parts -join '；')。"
+        }
+        return @{ ok = $true; active = $true; snapshotId = $snap.id; message = "Safe mode ON (pre-snapshot $($snap.id)). Restart DSH to boot with only dsh-undo-savepoint.$prunedTxt" }
     }
     if (-not $st.active) {
         if ($st.stale) {
@@ -353,10 +439,21 @@ function Set-UndoSafeMode([bool]$On) {
     if ($st.homeBackup -and -not (Test-Path -LiteralPath $st.homeBackup)) {
         return @{ ok = $false; error = 'Safe-mode home backup missing. Restore a snapshot from before the crash first (dsh-undo.ps1 list / restore).' }
     }
+    if ($st.pkgBackup -and -not (Test-Path -LiteralPath $st.pkgBackup)) {
+        return @{ ok = $false; error = 'Safe-mode package.json backup missing. Restore a snapshot from before the crash first (dsh-undo.ps1 list / restore).' }
+    }
     Copy-Item -LiteralPath $st.backup -Destination $patch -Force
     if ($st.homeBackup) { Copy-Item -LiteralPath $st.homeBackup -Destination $homePatch -Force }
+    $pkgRestored = $false
+    if ($st.pkgBackup) {
+        Copy-Item -LiteralPath $st.pkgBackup -Destination $pkgPath -Force
+        $pkgRestored = $true
+    }
     Remove-Item -LiteralPath $stateFile -Force -ErrorAction SilentlyContinue
-    return @{ ok = $true; active = $false; message = 'Safe mode OFF. Restart DSH to load all plugins again.' }
+    $restoreTxt = if ($pkgRestored) {
+        " 已恢复 profile package.json（原 $(@($st.prunedBundles).Count) 个被中和的 bundle 条目已还原）。"
+    } else { ' 旧版本状态：仅恢复 patch，package.json 未动。' }
+    return @{ ok = $true; active = $false; message = "Safe mode OFF. Restart DSH to load all plugins again.$restoreTxt" }
 }
 
 function Get-UndoSpecByName([string]$DestName) {

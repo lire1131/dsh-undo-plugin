@@ -2,6 +2,23 @@
 
 Notable changes to dsh-undo-savepoint. Dates are in local time (UTC+8). 中文版:[CHANGELOG.md](CHANGELOG.md)
 
+## [0.3.8] - 2026-08-21
+
+### Added (Safe Mode 2.0, roadmap R2+P1+B4+B5+B6)
+
+- **P1 · Safe-mode bundle neutralization**: safe mode previously only minimized the patch layer — useless when DSH cannot boot because a profile bundle fails the loader's hard checks. On entry, every `dsh.profile.bundles` entry is now validated with the same three rules as dsh-app-boot `loadProfile` (resolvable / has `dsh.bundle.patch` / patch file exists); failing entries are removed and written back (the original `package.json` is double-backed-up: snapshot + dedicated `safe-mode-pkg-<id>.json`). On exit the file is restored in full and the report names how many entries were neutralized. Edges: a missing `package.json` is skipped without blocking entry; a corrupt one refuses entry and is never destructively rewritten. Idempotent rescan: re-running `on` while active only rescans and reports, never rewrites
+- **B5 · Crash attribution v2 (crashReason)**: after a crash, the next startup scans the tail of candidate logs and classifies the crash as `session-corrupt` (session file damage) / `bundle-check` (bundle hard-check failure) / `patch-tree` (plugin mount/load failure) / `unknown`, persisted in `boot-state.json` (reused on the next boot so log rotation cannot lose the attribution). The `undo_list` crash banner now suggests a remedy per class (session-corrupt → `undo_scan`, bundle-check → safe mode), and `/api/undo/status` exposes `crashReason`
+- **B6 · `undo_scan` session health scan & repair**: scans `<home>/sessions/**/session.jsonl.zstd` and classifies each as `ok` / `fixable` (single-frame layout violation, the 8/18 crash root cause) / `corrupt` (undecodable / invalid first header line / bad JSON lines). With `quarantine=true`, `fixable` files are repaired in place: the original is copied to `<undo root>/corrupt-quarantine/` and kept as `.bak`, then recoded to "header frame + event frame" with triple verification (round-trip text identical / per-line JSON / re-analysis); `corrupt` files are only isolated (copied, never touched). Also ships `dsh-undo.ps1 scan [--fix] [-Label <home>]` and the offline script `tools/session-scan.mjs` (usable when DSH cannot boot)
+- **B4 · dsh-session-persistence-jsonl patch hosting**: the 3 tolerance patches (`appendBatch` self-heal / `listArtifacts` isolation / `readFirstZstdLine` tolerant) are hosted as `tools/dsh-patches.json` (old = rc8 original code, new = rc6 verified patches); `tools/apply-dsh-patches.ps1 status|verify|apply|remove` applies/reverts them offline (per-patch backup `.bak-<id>`, aborts on unknown state without writing). The plugin verifies read-only at startup and warns (never auto-edits files), and safe-mode entry reports missing patches too
+
+### Polish
+- `undo_safe_mode` tool description and WebUI confirm copy updated to v0.3.8 capabilities (bundle neutralization)
+
+### Tests
+- smoke 146 → 174 (5 new sections, 28 new assertions): P1 bundle-neutralization round trip + corrupt-package.json refusal, B5 log-signature classification (session-corrupt / bundle-check scenarios), B6 scan/repair/isolate/rescan, patch manifest old/new exactly matching the real rc8/rc6 targets
+- Fixed: edited `.ps1` files carry UTF-8 BOM again (case 25 encoding audit regression guard)
+- Final verification: smoke 174 green; e2e 10/10 no regression; home-resolution 2 branches green
+
 ## [0.3.7] - 2026-08-21
 
 ### Fixed (emergency release)

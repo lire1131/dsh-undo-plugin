@@ -12,13 +12,14 @@
 #   .\dsh-undo.ps1 prune [-KeepAuto 20]
 #   .\dsh-undo.ps1 status
 #   .\dsh-undo.ps1 settings                                   # show current settings
+#   .\dsh-undo.ps1 scan [--fix] [-Label <home>]               # scan/repair DSH session files (v0.3.8)
 #
 # Snapshot stores: D:\dsh\undo-snapshots\manual and \auto (shared with the
 # dsh-undo DSH plugin; legacy flat snapshots are read too).
 
 param(
     [Parameter(Position = 0)]
-    [ValidateSet('snapshot', 'list', 'diff', 'restore', 'undo', 'redo', 'remove', 'prune', 'export', 'import', 'status', 'settings', 'safe-mode', 'recent')]
+    [ValidateSet('snapshot', 'list', 'diff', 'restore', 'undo', 'redo', 'remove', 'prune', 'export', 'import', 'status', 'settings', 'safe-mode', 'recent', 'scan')]
     [string]$Command = 'status',
     [string]$Label = '',
     [string]$Id = '',
@@ -195,5 +196,29 @@ switch ($Command) {
             if ($st.active) { Write-Host "Safe mode is ON (entered $($st.enteredAt), backup $($st.backup))" }
             else { Write-Host 'Safe mode is OFF.' }
         }
+    }
+    'scan' {
+        # dsh-undo.ps1 scan [--fix] [-Label <home>]（v0.3.8, B6）
+        # 离线会话扫描/修复：DSH 起不来时也能用；--fix 通过 -Label 传入。
+        $fix = $false
+        $homeArg = $null
+        if ($Label) {
+            if ($Label -eq '--fix') { $fix = $true } else { $homeArg = $Label }
+        }
+        if (-not $homeArg) {
+            $homeArg = if ($env:DSH_HOME) { $env:DSH_HOME } else { Join-Path $HOME '.dsh' }
+        }
+        if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
+            Write-Host 'scan requires Node.js 20+ (node:zlib zstd support).'; exit 1
+        }
+        $scriptPath = Join-Path $PSScriptRoot 'session-scan.mjs'
+        if (-not (Test-Path -LiteralPath $scriptPath)) {
+            Write-Host "session-scan.mjs not found: $scriptPath"; exit 1
+        }
+        $nodeArgs = @($scriptPath)
+        if ($fix) { $nodeArgs += '--fix' }
+        $nodeArgs += $homeArg
+        & node $nodeArgs
+        exit $LASTEXITCODE
     }
 }

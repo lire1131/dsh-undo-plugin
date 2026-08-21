@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "note": "dsh-session-persistence-jsonl 容错补丁清单（v0.3.8, B4）。old = rc8 原始代码片段，new = rc6 已验证的补丁代码片段。apply/verify 通过精确子串匹配替换。",
+  "target": "@deepseek-ai/dsh-session-persistence-jsonl/lib/index.js",
+  "patches": [
+    {
+      "id": "appendBatch-selfheal",
+      "description": "appendBatch 自愈：并发/初始化竞态下文件 ENOENT 时 materialize 再追加（8/17 复盘 3.1）",
+      "old": "\t/** Durably append a batch, lazily materializing the file when not yet present. */\n\tasync appendBatch(meta, events, isMaterialized) {\n\t\tawait this.ensureRootEncoding();\n\t\tif (isMaterialized) await this.appendLines(meta, events);\n\t\telse await this.materialize(meta, events);\n\t}",
+      "new": "\t/** Durably append a batch, lazily materializing the file when not yet present. */\n\tasync appendBatch(meta, events, isMaterialized) {\n\t\tawait this.ensureRootEncoding();\n\t\tif (isMaterialized) {\n\t\t\ttry {\n\t\t\t\tawait this.appendLines(meta, events);\n\t\t\t} catch (error) {\n\t\t\t\tif (isENOENT(error)) await this.materialize(meta, events);\n\t\t\t\telse throw error;\n\t\t\t}\n\t\t} else await this.materialize(meta, events);\n\t}"
+    },
+    {
+      "id": "listArtifacts-isolate",
+      "description": "listArtifacts 隔离：corrupt Zstandard 会话只 warn+continue，绝不拖垮整个会话列表/DSH 启动（8/17 复盘 3.2）",
+      "old": "\t\t\t\tconst first = this.compression === \"zstd\" ? await this.readFirstZstdLine(path, signal) : await this.readFirstLine(path, signal);",
+      "new": "\t\t\t\tlet first;\n\t\t\t\ttry {\n\t\t\t\t\tfirst = this.compression === \"zstd\" ? await this.readFirstZstdLine(path, signal) : await this.readFirstLine(path, signal);\n\t\t\t\t} catch (error) {\n\t\t\t\t\tsignal?.throwIfAborted();\n\t\t\t\t\tif (isENOENT(error)) continue;\n\t\t\t\t\t// A corrupt artifact must never take down the whole session\n\t\t\t\t\t// listing (and therefore DSH boot): quarantine it with a\n\t\t\t\t\t// warning and keep every other session visible.\n\t\t\t\t\tif (typeof error?.message === \"string\" && error.message.startsWith(\"corrupt Zstandard session log:\")) {\n\t\t\t\t\t\tconsole.warn(`[session-persistence-jsonl] skipping unreadable session artifact: ${path} (${error.message})`);\n\t\t\t\t\t\tcontinue;\n\t\t\t\t\t}\n\t\t\t\t\tthrow error;\n\t\t\t\t}"
+    },
+    {
+      "id": "readFirstZstdLine-tolerant",
+      "description": "readFirstZstdLine 宽容：首帧多行（legacy 单帧整库文件）但首行是合法 header 时接受，否则跳过（8/17 复盘 3.2 / B6 关联）",
+      "old": "\t\t\t\tsignal?.throwIfAborted();\n\t\t\t\tassertZstdHeaderFrame(plaintext);\n\t\t\t\treturn plaintext.subarray(0, -1).toString(\"utf8\");",
+      "new": "\t\t\t\tsignal?.throwIfAborted();\n\t\t\t\ttry {\n\t\t\t\t\tassertZstdHeaderFrame(plaintext);\n\t\t\t\t\treturn plaintext.subarray(0, -1).toString(\"utf8\");\n\t\t\t\t} catch (error) {\n\t\t\t\t\t// Tolerate logs whose first frame carries more than the header\n\t\t\t\t\t// line (e.g. whole-log single-frame artifacts written by legacy\n\t\t\t\t\t// repair tooling): the header is still the first line of the\n\t\t\t\t\t// concatenated plaintext stream. Accept it only when that first\n\t\t\t\t\t// line is a well-formed session header; anything else is treated\n\t\t\t\t\t// as unreadable and skipped by the caller instead of failing\n\t\t\t\t\t// the entire listing.\n\t\t\t\t\tconst nl = plaintext.indexOf(10);\n\t\t\t\t\tif (nl <= 0) return void 0;\n\t\t\t\t\tconst meta = parseHeaderMeta(plaintext.subarray(0, nl).toString(\"utf8\"));\n\t\t\t\t\tif (meta === void 0) return void 0;\n\t\t\t\t\treturn plaintext.subarray(0, nl).toString(\"utf8\");\n\t\t\t\t}"
+    }
+  ]
+}

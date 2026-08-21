@@ -5,6 +5,7 @@ import { mkdtemp, writeFile, readFile, mkdir, rm as rmRaw, readdir } from 'node:
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
+import { zstdCompressSync } from 'node:zlib';
 
 // Windows 上 fs.rm 偶发 ENOTEMPTY（杀软/索引器短暂占用目录句柄），统一重试几次。
 // 对全部既有调用点生效，避免每个临时目录清理都写一遍重试。
@@ -1049,6 +1050,183 @@ apply(ctx25b, { manualDir: join(snap25, 'manual'), autoDir: join(snap25, 'auto')
 await new Promise((r) => setTimeout(r, 300));
 check(warns25b.some((w) => w.includes('degraded')), 'generic register error degrades with warning (safeEffect lid)');
 await cleanup(root25);
+
+console.log('== 35. P1: safe mode neutralizes bad bundles, restores on exit (v0.3.8) ==');
+const root26 = await mkdtemp(join(tmpdir(), 'dsh-undo-test26-'));
+const home26 = join(root26, 'home'), profile26 = join(root26, 'profile'), snap26 = join(root26, 'snaps');
+await mkdir(home26, { recursive: true }); await mkdir(profile26, { recursive: true });
+await writeFile(join(home26, 'settings.yaml'), 'model: x\n');
+await writeFile(join(profile26, 'cordis.patch.yml'), '# patch\n- insert:\n    - id: whale\n      name: dsh-whale-kit\n');
+const pkg26Raw = JSON.stringify({ name: 'test', dsh: { profile: { bundles: ['dsh-undo-test-good-26', 'dsh-undo-test-missing-26', 'dsh-undo-test-nopatch-26'] } } }, null, 2) + '\n';
+await writeFile(join(profile26, 'package.json'), pkg26Raw);
+// 好 bundle：profile node_modules 下真实可解析（含 dsh.bundle.patch 指向存在的文件）
+const goodDir = join(profile26, 'node_modules', 'dsh-undo-test-good-26');
+await mkdir(goodDir, { recursive: true });
+await writeFile(join(goodDir, 'package.json'), JSON.stringify({ name: 'dsh-undo-test-good-26', dsh: { bundle: { patch: './patch.yml' } } }));
+await writeFile(join(goodDir, 'patch.yml'), '- insert:\n    - id: good\n      name: dsh-undo-test-good-26\n');
+const tools26 = new Map();
+const ctx26 = {
+  tools: { register: (t) => { tools26.set(t.name, t); return () => { }; } },
+  systemPrompt: { section: () => () => { } }, get: () => undefined,
+  effect: (fn) => { const d = fn(); return d ?? (() => { }); }, logger: { info: () => { }, warn: () => { } },
+};
+apply(ctx26, { manualDir: join(snap26, 'manual'), autoDir: join(snap26, 'auto'), homeDir: home26, profileDir: profile26, watch: false, pluginDirs: [] });
+await new Promise((r) => setTimeout(r, 300));
+const run26 = async (name, args) => (await tools26.get(name).execute(args, {}));
+let out26 = await run26('undo_safe_mode', { action: 'on' });
+console.log('   ', out26.split('\n')[0]);
+check(out26.includes('Safe mode ON'), 'P1: safe mode entered');
+check(out26.includes('中和 2 个'), 'P1: report mentions 2 neutralized bundles');
+const pkg26 = JSON.parse(await readFile(join(profile26, 'package.json'), 'utf8'));
+check((pkg26.dsh?.profile?.bundles ?? []).join(',') === 'dsh-undo-test-good-26', 'P1: bad bundles removed, good kept');
+const st26 = JSON.parse(await readFile(join(snap26, 'auto', 'safe-mode.json'), 'utf8'));
+check(!!st26.pkgBackup && (st26.prunedBundles ?? []).length === 2, 'P1: state records pkgBackup + prunedBundles');
+check((await readFile(st26.pkgBackup, 'utf8')) === pkg26Raw, 'P1: package.json backup matches original');
+out26 = await run26('undo_safe_mode', { action: 'on' });
+check(out26.includes('already ON'), 'P1: re-entering is idempotent (rescan)');
+out26 = await run26('undo_safe_mode', { action: 'off' });
+check(out26.includes('Safe mode OFF'), 'P1: safe mode exits');
+const pkg26b = JSON.parse(await readFile(join(profile26, 'package.json'), 'utf8'));
+check((pkg26b.dsh?.profile?.bundles ?? []).join(',') === 'dsh-undo-test-good-26,dsh-undo-test-missing-26,dsh-undo-test-nopatch-26', 'P1: original bundles restored on exit');
+let stFile26Gone = false;
+try { await readFile(join(snap26, 'auto', 'safe-mode.json')); } catch { stFile26Gone = true; }
+check(stFile26Gone, 'P1: state file removed on exit');
+await cleanup(root26);
+
+console.log('== 36. P1: corrupt profile package.json -> refuse to enter, no destructive rewrite (v0.3.8) ==');
+const root27 = await mkdtemp(join(tmpdir(), 'dsh-undo-test27-'));
+const home27 = join(root27, 'home'), profile27 = join(root27, 'profile'), snap27 = join(root27, 'snaps');
+await mkdir(home27, { recursive: true }); await mkdir(profile27, { recursive: true });
+await writeFile(join(home27, 'settings.yaml'), 'model: x\n');
+await writeFile(join(profile27, 'cordis.patch.yml'), '# patch\n[]\n');
+const brokenPkg = '{"name":"test","dsh":{"profile":{"bundles":['; // 故意截断的 JSON
+await writeFile(join(profile27, 'package.json'), brokenPkg);
+const tools27 = new Map();
+const ctx27 = {
+  tools: { register: (t) => { tools27.set(t.name, t); return () => { }; } },
+  systemPrompt: { section: () => () => { } }, get: () => undefined,
+  effect: (fn) => { const d = fn(); return d ?? (() => { }); }, logger: { info: () => { }, warn: () => { } },
+};
+apply(ctx27, { manualDir: join(snap27, 'manual'), autoDir: join(snap27, 'auto'), homeDir: home27, profileDir: profile27, watch: false, pluginDirs: [] });
+await new Promise((r) => setTimeout(r, 300));
+const run27 = async (name, args) => (await tools27.get(name).execute(args, {}));
+const out27 = await run27('undo_safe_mode', { action: 'on' });
+check(out27.includes('解析失败'), 'P1: corrupt package.json -> refuse with clear error');
+check((await readFile(join(profile27, 'package.json'), 'utf8')) === brokenPkg, 'P1: corrupt package.json NOT rewritten');
+let st27Gone = false;
+try { await readFile(join(snap27, 'auto', 'safe-mode.json')); } catch { st27Gone = true; }
+check(st27Gone, 'P1: no safe-mode state written (entry refused)');
+await cleanup(root27);
+
+console.log('== 37. B5: crash attribution v2 — log signature classifies crashReason (v0.3.8) ==');
+// 崩溃横幅依赖 undo_list 非空（baseline 快照落盘）；轮询等待，避免时序抖动
+const waitBaseline = async (autoDir, ms = 4000) => {
+  const t0 = Date.now();
+  while (Date.now() - t0 < ms) {
+    try {
+      const es = await readdir(autoDir);
+      if (es.some((e) => /^\d{14}-[0-9a-f]{4}$/.test(e))) return;
+    } catch { /* autoDir 尚未创建 */ }
+    await new Promise((r) => setTimeout(r, 100));
+  }
+};
+// 场景 A：日志含会话损坏签名 → session-corrupt + undo_list 给出 undo_scan 建议
+const root28 = await mkdtemp(join(tmpdir(), 'dsh-undo-test28-'));
+const home28 = join(root28, 'home'), profile28 = join(root28, 'profile'), snap28 = join(root28, 'snaps');
+await mkdir(join(home28, 'logs'), { recursive: true }); await mkdir(profile28, { recursive: true });
+await writeFile(join(home28, 'settings.yaml'), 'model: x\n');
+await writeFile(join(home28, 'logs', 'dsh.log'), '... boot ...\ncorrupt Zstandard session log: frame at byte 0 failed validation\n');
+await writeFile(join(profile28, 'cordis.patch.yml'), '# patch\n[]\n');
+await writeFile(join(profile28, 'package.json'), '{"name":"test","v":1}\n');
+// 模拟上次崩溃：boot-state.json 记 ok:false
+await mkdir(snap28, { recursive: true }); await mkdir(join(snap28, 'auto'), { recursive: true });
+await writeFile(join(snap28, 'auto', 'boot-state.json'), JSON.stringify({ startedAt: new Date().toISOString(), pid: 1, ok: false, okAt: null, lastGoodAt: '2026-08-21T00:00:00.000Z' }));
+const tools28 = new Map();
+const ctx28 = {
+  tools: { register: (t) => { tools28.set(t.name, t); return () => { }; } },
+  systemPrompt: { section: () => () => { } }, get: () => undefined,
+  effect: (fn) => { const d = fn(); return d ?? (() => { }); }, logger: { info: () => { }, warn: () => { } },
+};
+apply(ctx28, { manualDir: join(snap28, 'manual'), autoDir: join(snap28, 'auto'), homeDir: home28, profileDir: profile28, watch: false, pluginDirs: [] });
+await waitBaseline(join(snap28, 'auto'));
+const run28 = async (name, args) => (await tools28.get(name).execute(args, {}));
+const list28 = await run28('undo_list', {});
+check(list28.includes('did not finish starting'), 'B5: crash alert shown');
+check(list28.includes('undo_scan'), 'B5: session-corrupt advice suggests undo_scan');
+const bs28 = JSON.parse(await readFile(join(snap28, 'auto', 'boot-state.json'), 'utf8'));
+check(bs28.crashReason === 'session-corrupt', `B5: boot-state classifies crashReason (got ${bs28.crashReason})`);
+await cleanup(root28);
+// 场景 B：日志含 bundle 校验签名 → bundle-check + 建议进安全模式
+const root29 = await mkdtemp(join(tmpdir(), 'dsh-undo-test29-'));
+const home29 = join(root29, 'home'), profile29 = join(root29, 'profile'), snap29 = join(root29, 'snaps');
+await mkdir(join(home29, 'logs'), { recursive: true }); await mkdir(profile29, { recursive: true });
+await writeFile(join(home29, 'settings.yaml'), 'model: x\n');
+await writeFile(join(home29, 'logs', 'dsh.log'), 'loadProfile: package "x" declares no dsh.bundle\n');
+await writeFile(join(profile29, 'cordis.patch.yml'), '# patch\n[]\n');
+await writeFile(join(profile29, 'package.json'), '{"name":"test","v":1}\n');
+await mkdir(snap29, { recursive: true }); await mkdir(join(snap29, 'auto'), { recursive: true });
+await writeFile(join(snap29, 'auto', 'boot-state.json'), JSON.stringify({ startedAt: new Date().toISOString(), pid: 1, ok: false, okAt: null, lastGoodAt: '2026-08-21T00:00:00.000Z' }));
+const tools29 = new Map();
+const ctx29 = {
+  tools: { register: (t) => { tools29.set(t.name, t); return () => { }; } },
+  systemPrompt: { section: () => () => { } }, get: () => undefined,
+  effect: (fn) => { const d = fn(); return d ?? (() => { }); }, logger: { info: () => { }, warn: () => { } },
+};
+apply(ctx29, { manualDir: join(snap29, 'manual'), autoDir: join(snap29, 'auto'), homeDir: home29, profileDir: profile29, watch: false, pluginDirs: [] });
+await waitBaseline(join(snap29, 'auto'));
+const run29 = async (name, args) => (await tools29.get(name).execute(args, {}));
+const list29 = await run29('undo_list', {});
+check(list29.includes('bundle'), 'B5: bundle-check advice mentions bundle neutralization');
+const bs29 = JSON.parse(await readFile(join(snap29, 'auto', 'boot-state.json'), 'utf8'));
+check(bs29.crashReason === 'bundle-check', `B5: boot-state classifies bundle-check (got ${bs29.crashReason})`);
+await cleanup(root29);
+
+console.log('== 38. B6: undo_scan — session health scan, fixable repair, corrupt isolation (v0.3.8) ==');
+const root30 = await mkdtemp(join(tmpdir(), 'dsh-undo-test30-'));
+const home30 = join(root30, 'home'), profile30 = join(root30, 'profile'), snap30 = join(root30, 'snaps');
+await mkdir(home30, { recursive: true }); await mkdir(profile30, { recursive: true });
+await writeFile(join(home30, 'settings.yaml'), 'model: x\n');
+await writeFile(join(profile30, 'cordis.patch.yml'), '# patch\n[]\n');
+await writeFile(join(profile30, 'package.json'), '{"name":"test","v":1}\n');
+// 会话文件：sess-ok（合规双帧）/ sess-fix（单帧违规）/ sess-bad（坏 magic）
+const hdr30 = JSON.stringify({ type: 'session', version: 1, id: 'sess1', createdAt: 1234567890, delegationDepth: 0 }) + '\n';
+const evt30 = JSON.stringify({ type: 'event', text: 'hello' }) + '\n';
+const sessOk = join(home30, 'sessions', 'sess-ok');
+const sessFix = join(home30, 'sessions', 'sess-fix');
+const sessBad = join(home30, 'sessions', 'sess-bad');
+await mkdir(sessOk, { recursive: true }); await mkdir(sessFix, { recursive: true }); await mkdir(sessBad, { recursive: true });
+await writeFile(join(sessOk, 'session.jsonl.zstd'), Buffer.concat([zstdCompressSync(Buffer.from(hdr30, 'utf8')), zstdCompressSync(Buffer.from(evt30, 'utf8'))]));
+const fixBytes = zstdCompressSync(Buffer.from(hdr30 + evt30, 'utf8')); // 单帧
+await writeFile(join(sessFix, 'session.jsonl.zstd'), fixBytes);
+const badBytes = Buffer.from([0xde, 0xad, 0xbe, 0xef, 0x00, 0x01, 0x02]);
+await writeFile(join(sessBad, 'session.jsonl.zstd'), badBytes);
+const tools30 = new Map();
+const ctx30 = {
+  tools: { register: (t) => { tools30.set(t.name, t); return () => { }; } },
+  systemPrompt: { section: () => () => { } }, get: () => undefined,
+  effect: (fn) => { const d = fn(); return d ?? (() => { }); }, logger: { info: () => { }, warn: () => { } },
+};
+apply(ctx30, { manualDir: join(snap30, 'manual'), autoDir: join(snap30, 'auto'), homeDir: home30, profileDir: profile30, watch: false, pluginDirs: [] });
+await new Promise((r) => setTimeout(r, 350));
+const run30 = async (name, args) => (await tools30.get(name).execute(args, {}));
+const scan1 = await run30('undo_scan', {});
+check(scan1.includes('3 session file(s)'), 'B6: scan reports 3 files');
+check(scan1.includes('ok       ') && scan1.includes('sess-ok'), 'B6: compliant file marked ok');
+check(scan1.includes('fixable  ') && scan1.includes('sess-fix'), 'B6: single-frame file marked fixable');
+check(scan1.includes('corrupt  ') && scan1.includes('sess-bad'), 'B6: bad-magic file marked corrupt');
+check(scan1.includes('summary: 1 ok, 0 fixed, 1 fixable, 0 isolated, 1 corrupt'), 'B6: read-only summary correct');
+// quarantine 模式：修复 fixable（.bak + 隔离复制），corrupt 仅隔离
+const scan2 = await run30('undo_scan', { quarantine: true });
+check(scan2.includes('fixed    ') && scan2.includes('sess-fix'), 'B6: fixable repaired in quarantine mode');
+check(scan2.includes('-> isolated'), 'B6: corrupt file isolated (not touched)');
+check(Buffer.compare(await readFile(join(sessFix, 'session.jsonl.zstd.bak')), fixBytes) === 0, 'B6: .bak of original kept');
+check(Buffer.compare(await readFile(join(sessBad, 'session.jsonl.zstd')), badBytes) === 0, 'B6: corrupt file content untouched');
+const qdir30 = join(snap30, 'corrupt-quarantine');
+check((await readdir(qdir30)).some((f) => f.includes('sess-bad') && f.includes('corrupt')), 'B6: corrupt file isolated under undo root quarantine dir');
+// 复扫：sess-fix 应变为 ok
+const scan3 = await run30('undo_scan', {});
+check(scan3.includes('ok       ') && scan3.includes('sess-fix'), 'B6: repaired file now ok on rescan');
+await cleanup(root30);
 
 await rm(root, { recursive: true, force: true });
 console.log(`\n== RESULT: ${pass} passed, ${fail} failed ==`);
