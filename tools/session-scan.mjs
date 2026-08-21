@@ -11,7 +11,8 @@
 import { readdir, readFile, writeFile, mkdir } from 'node:fs/promises';
 import { join, dirname, basename } from 'node:path';
 import { homedir } from 'node:os';
-import { zstdCompressSync, zstdDecompressSync, constants } from 'node:zlib';
+// zstd Zlib API 需 Node 22.15+；Node 20 下属性为 undefined，脚本给出明确提示后退出（不崩）。
+import * as zlib from 'node:zlib';
 
 const args = process.argv.slice(2);
 const fix = args.includes('--fix');
@@ -22,8 +23,15 @@ if (rest.length > 1) {
 }
 const home = rest[0] ?? process.env.DSH_HOME ?? join(homedir(), '.dsh');
 
+const zstdCompressSync = typeof zlib.zstdCompressSync === 'function' ? zlib.zstdCompressSync : null;
+const zstdDecompressSync = typeof zlib.zstdDecompressSync === 'function' ? zlib.zstdDecompressSync : null;
+if (!zstdCompressSync || !zstdDecompressSync) {
+  console.error('session-scan requires Node.js >= 22.15 (node:zlib zstd API not available on this Node version).');
+  process.exit(2);
+}
+
 const ZSTD_MAGIC = 4247762216;
-const ZSTD_CHECKSUM = { params: { [constants.ZSTD_c_checksumFlag]: 1 } };
+const ZSTD_CHECKSUM = { params: { [zlib.constants?.ZSTD_c_checksumFlag]: 1 } };
 
 function zstdScanFrames(b) {
   const frames = [];

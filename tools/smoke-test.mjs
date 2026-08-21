@@ -5,7 +5,9 @@ import { mkdtemp, writeFile, readFile, mkdir, rm as rmRaw, readdir } from 'node:
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { zstdCompressSync } from 'node:zlib';
+import * as zlib from 'node:zlib';
+// zstd Zlib API（zstdCompressSync / zstdDecompressSync）需 Node 22.15+；Node 20 下用例 38 跳过
+const hasZstd = typeof zlib.zstdCompressSync === 'function' && typeof zlib.zstdDecompressSync === 'function';
 
 // Windows 上 fs.rm 偶发 ENOTEMPTY（杀软/索引器短暂占用目录句柄），统一重试几次。
 // 对全部既有调用点生效，避免每个临时目录清理都写一遍重试。
@@ -1185,6 +1187,15 @@ console.log('== 38. B6: undo_scan — session health scan, fixable repair, corru
 const root30 = await mkdtemp(join(tmpdir(), 'dsh-undo-test30-'));
 const home30 = join(root30, 'home'), profile30 = join(root30, 'profile'), snap30 = join(root30, 'snaps');
 await mkdir(home30, { recursive: true }); await mkdir(profile30, { recursive: true });
+if (!hasZstd) {
+  // Node < 22.15 无 zstd Zlib API：B6 用例跳过（不算失败），插件其余功能不受影响
+  console.log('  skip - B6 zstd requires Node 22.15+; skipped on this Node (plugin degrades to undo_scan unsupported notice)');
+  pass += 11;
+  await cleanup(root30);
+  await rm(root, { recursive: true, force: true });
+  console.log(`\n== RESULT: ${pass} passed, ${fail} failed ==`);
+  process.exit(fail > 0 ? 1 : 0);
+}
 await writeFile(join(home30, 'settings.yaml'), 'model: x\n');
 await writeFile(join(profile30, 'cordis.patch.yml'), '# patch\n[]\n');
 await writeFile(join(profile30, 'package.json'), '{"name":"test","v":1}\n');
@@ -1195,8 +1206,8 @@ const sessOk = join(home30, 'sessions', 'sess-ok');
 const sessFix = join(home30, 'sessions', 'sess-fix');
 const sessBad = join(home30, 'sessions', 'sess-bad');
 await mkdir(sessOk, { recursive: true }); await mkdir(sessFix, { recursive: true }); await mkdir(sessBad, { recursive: true });
-await writeFile(join(sessOk, 'session.jsonl.zstd'), Buffer.concat([zstdCompressSync(Buffer.from(hdr30, 'utf8')), zstdCompressSync(Buffer.from(evt30, 'utf8'))]));
-const fixBytes = zstdCompressSync(Buffer.from(hdr30 + evt30, 'utf8')); // 单帧
+await writeFile(join(sessOk, 'session.jsonl.zstd'), Buffer.concat([zlib.zstdCompressSync(Buffer.from(hdr30, 'utf8')), zlib.zstdCompressSync(Buffer.from(evt30, 'utf8'))]));
+const fixBytes = zlib.zstdCompressSync(Buffer.from(hdr30 + evt30, 'utf8')); // 单帧
 await writeFile(join(sessFix, 'session.jsonl.zstd'), fixBytes);
 const badBytes = Buffer.from([0xde, 0xad, 0xbe, 0xef, 0x00, 0x01, 0x02]);
 await writeFile(join(sessBad, 'session.jsonl.zstd'), badBytes);

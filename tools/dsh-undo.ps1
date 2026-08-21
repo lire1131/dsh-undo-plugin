@@ -209,7 +209,7 @@ switch ($Command) {
             $homeArg = if ($env:DSH_HOME) { $env:DSH_HOME } else { Join-Path $HOME '.dsh' }
         }
         if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
-            Write-Host 'scan requires Node.js 20+ (node:zlib zstd support).'; exit 1
+            Write-Host 'scan requires Node.js; please install Node.js first.'; exit 1
         }
         $scriptPath = Join-Path $PSScriptRoot 'session-scan.mjs'
         if (-not (Test-Path -LiteralPath $scriptPath)) {
