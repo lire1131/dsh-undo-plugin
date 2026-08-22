@@ -44,15 +44,15 @@ switch ($Command) {
     'snapshot' {
         $reason = if ($Label) { $Label } else { 'manual' }
         $s = New-UndoSnapshot 'manual' $reason
-        Write-Host "Manual snapshot $($s.id) created ($(@($s.files).Count) file(s), reason: $reason). Store: $((Get-UndoSettings).manualDir)"
+        Write-Host (Get-UndoText 'snap.created' -Params @{ id = $s.id; n = @($s.files).Count; reason = $reason; dir = (Get-UndoSettings).manualDir })
     }
     'undo' {
         $r = Invoke-UndoRestore 'undo' '' -SyncDeps:$SyncDeps
         if (-not $r.ok) { Write-Host "undo failed: $($r.error)"; exit 1 }
         if ($r.unchanged) { Write-Host $r.message; exit 0 }
-        Write-Host "Undone: restored $($r.targetId) ($($r.targetKind): $($r.targetReason))"
-        Write-Host "Files: $($r.restored -join ', ')"
-        Write-Host "Pre-restore safety snapshot: $($r.preSnapshotId) (redo target)"
+        Write-Host (Get-UndoText 'restore.ok' -Params @{ id = $r.targetId; kind = $r.targetKind; reason = $(if ($r.targetReason) { ": $($r.targetReason)" } else { '' }) })
+        Write-Host (Get-UndoText 'restore.files' -Params @{ files = $r.restored -join ', ' })
+        Write-Host (Get-UndoText 'restore.prestate' -Params @{ id = $r.preSnapshotId })
         if ($r.remounted) { Write-Host 'dsh-undo mount re-ensured in cordis.patch.yml' }
         if ($r.missing -and @($r.missing).Count -gt 0) { Write-Host "Not restored: $($r.missing -join ', ')" }
         if ($r.needsRestart) { Write-Host 'NOTE: a restart of DSH is required for the restored state to take effect.' }

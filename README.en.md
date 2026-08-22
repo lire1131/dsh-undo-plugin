@@ -179,7 +179,7 @@ After that, double-click the desktop **DSH Undo Manager** icon to open the exter
 
 ### Offline tools (works even when DSH won't boot)
 
-> GUI language: the manager window follows the system UI language (zh/en); force it with `DSH_UNDO_LANG=zh|en`.
+> UI language: force it with `DSH_UNDO_LANG=zh|en`; otherwise Chinese on Chinese hosts, English otherwise. Applies to the host command output, the offline CLI/GUI, and the WebUI. The single dictionary source is `lib/i18n/{zh,en}.json` (shared by host and WebUI so they cannot drift).
 
 From the repository directory:
 

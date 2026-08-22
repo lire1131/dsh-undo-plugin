@@ -2,6 +2,25 @@
 
 dsh-undo-savepoint 的重要变更。日期为本地时间(UTC+8)。English version: [CHANGELOG.en.md](CHANGELOG.en.md)
 
+## [0.3.9] - 2026-08-22
+
+### 新功能（升级规划 R1+R4+I13 落地）
+
+- **R1 · 多语言（host / CLI / WebUI 一起落地）**：
+  - 新增 `lib/i18n/{zh,en}.json` 作为唯一词典源（140 键，覆盖 host 用户可见消息与 WebUI 全部文案）；零依赖翻译器 `lib/i18n.mjs`（`t(key, vars?, lang?)`），语言优先级 `DSH_UNDO_LANG` > 本机 `Intl`/`LANG` 中文 > en 兜底
+  - host 端 `lib/index.js` 用户可见文案接入 `t()`：安全模式（进入/已开启/重扫/中和/补丁提示/状态/退出/损坏包拒绝）、undo/redo/restore 结果渲染、busy 拦截、快照/列表/差异/清理/导出/导入/最近回滚/版权，`smoke` 固定 `DSH_UNDO_LANG=en` 后断言保持不变
+  - WebUI（`lib/client.js`）沿用 `ctx.locale.register/bind`（rc8 已确认兼容），内联 zh/en 词典与 `lib/i18n` 做**单一词典源一致性断言**（client 每键在 JSON 存在且非空、zh/en 键集一致），防止两处飘移
+  - 离线 CLI（`dsh-undo.ps1` / `dsh-undo-savepoint-lib.ps1`）：新增 `Get-UndoLanguage` / `Get-UndoText`（读 `lib/i18n/*.json`，`DSH_UNDO_LANG` / `$PSUICulture` 选择），`snapshot`、`undo` 等结果文案双语化；`.ps1` 保持 UTF-8 with BOM
+- **R4 · 产物体积门禁缩到 5M**：新增 `tools/check-size.mjs`，扫描 `lib/` + `tools/` + 顶层 `package.json`/README/CHANGELOG/LICENSE/`cordis.patch.yml`，跳过 `node_modules/.git/.github/docs`；`npm test` 首位执行，超过 5MB 即失败。当前产物约 565KB
+- **I13 · 主题色变量化（`--dsw-alias-*`）**：WebUI `client.js` 硬编码颜色迁移到 `--dsw-alias-bg-layer-1 / --dsw-alias-bg-mask-1 / --dsw-alias-border-l3 / --dsw-alias-state-error-primary / --dsw-alias-state-success-primary / --dsw-alias-state-business-primary`（`--dsw-specific-tip` 保留），配合主题切换
+
+### 测试
+- smoke 174 → 180（+6 个 WebUI/词典一致性断言）；`npm test` 全链（check-size → check-version → smoke → home-resolution → e2e）绿
+- e2e 10/10 无回归；CLI `status` 在 `DSH_UNDO_LANG=en` 下可运行
+
+### 入口
+- 环境变量：`DSH_UNDO_LANG`（`zh`/`en`；未设置时宿主中文环境默认中文，否则英文）
+
 ## [0.3.8] - 2026-08-21
 
 ### 新功能（安全模式 2.0，升级规划 R2+P1+B4+B5+B6）

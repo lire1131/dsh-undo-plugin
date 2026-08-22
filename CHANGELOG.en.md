@@ -2,6 +2,25 @@
 
 Notable changes to dsh-undo-savepoint. Dates are in local time (UTC+8). 中文版:[CHANGELOG.md](CHANGELOG.md)
 
+## [0.3.9] - 2026-08-22
+
+### Added (roadmap R1+R4+I13)
+
+- **R1 · i18n (host / CLI / WebUI together)**:
+  - New `lib/i18n/{zh,en}.json` is the single dictionary source (140 keys covering every user-visible host message and all WebUI strings); a zero-dependency translator `lib/i18n.mjs` (`t(key, vars?, lang?)`) picks language with priority `DSH_UNDO_LANG` > machine `Intl`/`LANG` Chinese > en fallback
+  - Host `lib/index.js` now routes user-visible text through `t()`: safe mode (enter / already-on / rescan / neutralized / patch note / status / exit / corrupt-package refusal), undo/redo/restore result rendering, busy guard, and snapshot/list/diff/prune/export/import/recent output. `smoke` pins `DSH_UNDO_LANG=en` so existing English assertions stay valid
+  - WebUI (`lib/client.js`) keeps `ctx.locale.register/bind` (confirmed compatible with rc8), and its inline zh/en dictionary is cross-checked against `lib/i18n` with a **single-source consistency assertion** (every client key exists non-empty in JSON, zh/en key sets match), preventing the two from drifting
+  - Offline CLI (`dsh-undo.ps1` / `dsh-undo-savepoint-lib.ps1`): new `Get-UndoLanguage` / `Get-UndoText` (reads `lib/i18n/*.json`, selects via `DSH_UNDO_LANG` / `$PSUICulture`); `snapshot`, `undo` and other result text are bilingual. `.ps1` files keep UTF-8 with BOM
+- **R4 · artifact size gate tightened to 5M**: new `tools/check-size.mjs` scans `lib/` + `tools/` + top-level `package.json`/README/CHANGELOG/LICENSE/`cordis.patch.yml`, skipping `node_modules/.git/.github/docs`; `npm test` runs it first and fails on >5MB. Current artifact ≈565KB
+- **I13 · theme variables (`--dsw-alias-*`)**: WebUI `client.js` hard-coded colors moved to `--dsw-alias-bg-layer-1 / --dsw-alias-bg-mask-1 / --dsw-alias-border-l3 / --dsw-alias-state-error-primary / --dsw-alias-state-success-primary / --dsw-alias-state-business-primary` (`--dsw-specific-tip` kept), for theme switching
+
+### Tests
+- smoke 174 → 180 (+6 WebUI/dictionary consistency assertions); full `npm test` chain (check-size → check-version → smoke → home-resolution → e2e) green
+- e2e 10/10 no regression; CLI `status` runs under `DSH_UNDO_LANG=en`
+
+### Entry points
+- Env var: `DSH_UNDO_LANG` (`zh`/`en`; defaults to Chinese on Chinese hosts, otherwise English)
+
 ## [0.3.8] - 2026-08-21
 
 ### Added (Safe Mode 2.0, roadmap R2+P1+B4+B5+B6)

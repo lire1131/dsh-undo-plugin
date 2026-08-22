@@ -19,6 +19,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
+      - name: Validate package size gate (<5MB, R4)
+        run: node tools/check-size.mjs
       - name: Validate package version (semver)
         run: node tools/check-version.mjs
       - name: Install peer dependency for tests

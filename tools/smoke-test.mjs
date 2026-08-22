@@ -1,6 +1,8 @@
 // tools/smoke-test.mjs — offline smoke test of dsh-undo-savepoint logic (no DSH needed).
 // Run:  node tools/smoke-test.mjs
 process.env.DSH_ROOT = process.env.DSH_ROOT ?? 'C:/Users/yzf';
+// 测试固定英文输出（V0.3.9 R7）：host 端随 DSH_UNDO_LANG 本地化，断言基于英文文案。
+process.env.DSH_UNDO_LANG = 'en';
 import { mkdtemp, writeFile, readFile, mkdir, rm as rmRaw, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -672,11 +674,11 @@ await set17('{"v":2}\n');
 await run17('undo_snapshot', { reason: 's2' });
 out = await run17('undo_restore', { mode: 'undo' });
 console.log('   ', out.split('\n')[0]);
-check(out.includes('有会话正在运行'), 'undo_restore rejected while a turn is open (busy)');
+check(out.includes('A session is running'), 'undo_restore rejected while a turn is open (busy)');
 check((await readFile(join(profile17, 'package.json'), 'utf8')).includes('"v":2'), 'config NOT rolled back while busy');
 out = await run17('undo_safe_mode', { action: 'on' });
 console.log('   ', out.split('\n')[0]);
-check(out.includes('有会话正在运行'), 'safe mode rejected while a turn is open (busy)');
+check(out.includes('A session is running'), 'safe mode rejected while a turn is open (busy)');
 check(!(await readFile(join(profile17, 'cordis.patch.yml'), 'utf8')).includes('SAFE MODE'), 'patch NOT rewritten while busy');
 // closed-turn session -> guard must NOT fire (idle behavior unchanged)
 const closedStore = { list: () => [{ id: 's2', events: [{ type: 'turn/start', data: { turn: 1 } }, { type: 'turn/end', data: { turn: 1 } }] }] };
@@ -1078,7 +1080,7 @@ const run26 = async (name, args) => (await tools26.get(name).execute(args, {}));
 let out26 = await run26('undo_safe_mode', { action: 'on' });
 console.log('   ', out26.split('\n')[0]);
 check(out26.includes('Safe mode ON'), 'P1: safe mode entered');
-check(out26.includes('中和 2 个'), 'P1: report mentions 2 neutralized bundles');
+check(out26.includes('Neutralized 2'), 'P1: report mentions 2 neutralized bundles');
 const pkg26 = JSON.parse(await readFile(join(profile26, 'package.json'), 'utf8'));
 check((pkg26.dsh?.profile?.bundles ?? []).join(',') === 'dsh-undo-test-good-26', 'P1: bad bundles removed, good kept');
 const st26 = JSON.parse(await readFile(join(snap26, 'auto', 'safe-mode.json'), 'utf8'));
@@ -1113,7 +1115,7 @@ apply(ctx27, { manualDir: join(snap27, 'manual'), autoDir: join(snap27, 'auto'),
 await new Promise((r) => setTimeout(r, 300));
 const run27 = async (name, args) => (await tools27.get(name).execute(args, {}));
 const out27 = await run27('undo_safe_mode', { action: 'on' });
-check(out27.includes('解析失败'), 'P1: corrupt package.json -> refuse with clear error');
+check(out27.includes('could not be parsed'), 'P1: corrupt package.json -> refuse with clear error');
 check((await readFile(join(profile27, 'package.json'), 'utf8')) === brokenPkg, 'P1: corrupt package.json NOT rewritten');
 let st27Gone = false;
 try { await readFile(join(snap27, 'auto', 'safe-mode.json')); } catch { st27Gone = true; }
@@ -1238,6 +1240,43 @@ check((await readdir(qdir30)).some((f) => f.includes('sess-bad') && f.includes('
 const scan3 = await run30('undo_scan', {});
 check(scan3.includes('ok       ') && scan3.includes('sess-fix'), 'B6: repaired file now ok on rescan');
 await cleanup(root30);
+
+// ── V0.3.9 R7：WebUI 内联词典 与 lib/i18n 单一词典源一致性 ─────────────────────
+// client.js 内联 zh/en 词典必须与 lib/i18n/{zh,en}.json 的 WebUI 子集严格一致，
+// 防止"词典源"（JSON）与 WebUI 实际渲染文案漂移（issue 类根因）。host 额外使用
+// JSON 中 host 专用 key，故这里只要求 client.js 的 key 全部存在于 JSON 且非空。
+{
+  const cliText = await readFile(fileURLToPath(new URL('../lib/client.js', import.meta.url)), 'utf8');
+  const extractDict = (name) => {
+    const marker = 'const ' + name + ' = {';
+    const start = cliText.indexOf(marker);
+    if (start < 0) throw new Error('client.js: ' + marker + ' not found');
+    const body = cliText.slice(start + marker.length);
+    const end = body.indexOf('\n\t\t};');
+    const block = end >= 0 ? body.slice(0, end) : body;
+    const keys = new Set();
+    const re = /"([A-Za-z0-9_.-]+)"\s*:\s*/g;
+    let m;
+    while ((m = re.exec(block)) !== null) keys.add(m[1]);
+    return keys;
+  };
+  const zhKeys = extractDict('zh');
+  const enKeys = extractDict('en');
+  const jsons = {
+    zh: JSON.parse(await readFile(fileURLToPath(new URL('../lib/i18n/zh.json', import.meta.url)), 'utf8')),
+    en: JSON.parse(await readFile(fileURLToPath(new URL('../lib/i18n/en.json', import.meta.url)), 'utf8')),
+  };
+  check(zhKeys.size === enKeys.size, 'WebUI client zh/en key counts match (' + zhKeys.size + ' vs ' + enKeys.size + ')');
+  const onlyZh = [...zhKeys].filter((k) => !enKeys.has(k));
+  const onlyEn = [...enKeys].filter((k) => !zhKeys.has(k));
+  check(onlyZh.length === 0 && onlyEn.length === 0, 'WebUI client zh/en key sets identical (extra zh: ' + (onlyZh.join(', ') || 'none') + '; extra en: ' + (onlyEn.join(', ') || 'none') + ')');
+  const missingZh = [...zhKeys].filter((k) => !(k in jsons.zh));
+  check(missingZh.length === 0, 'all WebUI keys exist in lib/i18n/zh.json (missing: ' + (missingZh.join(', ') || 'none') + ')');
+  check([...zhKeys].every((k) => k in jsons.en && jsons.en[k]), 'all WebUI keys present and non-empty in lib/i18n/en.json');
+  check(Object.keys(jsons.zh).length === Object.keys(jsons.en).length, 'lib/i18n zh/en key counts match (' + Object.keys(jsons.zh).length + ' vs ' + Object.keys(jsons.en).length + ')');
+  const jsonOnly = Object.keys(jsons.zh).filter((k) => !(k in jsons.en));
+  check(jsonOnly.length === 0, 'lib/i18n zh/en key sets identical (extra zh: ' + (jsonOnly.join(', ') || 'none') + ')');
+}
 
 await rm(root, { recursive: true, force: true });
 console.log(`\n== RESULT: ${pass} passed, ${fail} failed ==`);

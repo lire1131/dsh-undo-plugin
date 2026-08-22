@@ -183,7 +183,7 @@ explorer "$dshHome\profiles\web\node_modules\dsh-undo-savepoint\tools"
 
 ### 局外工具(DSH 挂了也能用)
 
-> 界面语言:程序窗口按系统 UI 语言自动显示中文/英文;可用环境变量 `DSH_UNDO_LANG=zh|en` 强制指定。
+> 界面语言:`DSH_UNDO_LANG=zh|en` 强制指定;未设置时中文系统默认中文、否则英文。服务端(host)命令输出、离线 CLI/GUI、WebUI 全部生效。词典源统一为 `lib/i18n/{zh,en}.json`(host 与 WebUI 共用,避免各写一份)。
 
 进入仓库目录后:
 

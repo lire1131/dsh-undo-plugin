@@ -1183,3 +1183,43 @@ function Get-UndoDiffText([string]$Id) {
     if ($sb.Length -eq 0) { return '(no differences)' }
     return $sb.ToString()
 }
+
+# ── 多语言（V0.3.9 R7）：离线 CLI/GUI 语言选择与翻译 ──────────────────────────
+# 唯一词典源：lib/i18n/{zh,en}.json（与 Node host / WebUI 共用同一份数据，防漂移）。
+# 优先级：$env:DSH_UNDO_LANG > $PSUICulture（中文系统→zh）> en 兜底。
+# 用法：Get-UndoText -Key 'snap.created' -Params @{ id = $x; n = $y } -Lang 'zh'
+function Get-UndoLanguage {
+    if ($env:DSH_UNDO_LANG) {
+        $l = $env:DSH_UNDO_LANG.ToLower()
+        if ($l.StartsWith('zh')) { return 'zh' }
+        if ($l.StartsWith('en')) { return 'en' }
+        return 'en'
+    }
+    try {
+        if ($PSUICulture -match '^zh') { return 'zh' }
+    } catch { /* 区域不可用时忽略 */ }
+    return 'en'
+}
+
+function Get-UndoText {
+    param(
+        [Parameter(Mandatory = $true)][string]$Key,
+        [hashtable]$Params = @{},
+        [string]$Lang = ''
+    )
+    if (-not $Lang) { $Lang = Get-UndoLanguage }
+    $i18nDir = Join-Path $PSScriptRoot '..\lib\i18n'
+    $file = Join-Path $i18nDir "$Lang.json"
+    if (-not (Test-Path -LiteralPath $file)) { $file = Join-Path $i18nDir 'en.json' }
+    if (-not (Test-Path -LiteralPath $file)) { return $Key }
+    try {
+        $dict = Get-Content -LiteralPath $file -Raw -Encoding UTF8 | ConvertFrom-Json
+        $prop = $dict.PSObject.Properties[$Key]
+        if (-not $prop) { return $Key }
+        $text = [string]$prop.Value
+    } catch { return $Key }
+    foreach ($k in $Params.Keys) {
+        $text = $text.Replace('{' + $k + '}', [string]$Params[$k])
+    }
+    return $text
+}
