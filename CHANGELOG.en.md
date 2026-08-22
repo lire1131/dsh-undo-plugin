@@ -4,72 +4,72 @@ Notable changes to dsh-undo-savepoint. Dates are in local time (UTC+8). 中文�
 
 ## [0.4.1] - 2026-08-23
 
-### Fixes
+### Fixed
 
 - **macOS late-delivery fix (CI e2e-watch)**: after restore/undo, `ensureMount` records the content hash it rewrites into `cordis.patch.yml` into `restoredHashes`, so the watcher's content-echo detection recognizes it as mount bookkeeping, not a user change; this stops macOS FSEvents from delivering events outside the synchronous `suppressAuto` window and turning them into an echo snapshot that blocks redo. Verified across the three-platform CI (previously only macOS failed; now macOS/ubuntu/windows are green).
 
 ## [0.4.0] - 2026-08-22
 
-### New features (upgrade plan V0.3.9→V0.4.0)
+### Added
 
 - **Cross-platform**: core extracted to pure-Node, zero-dep `lib/core.mjs` (~1900 lines, ~100 exports) with `lib/index.js` as a thin host shell; ZIP (`lib/zip.mjs`, pure Node, PowerShell-compatible), dir/file pickers and pnpm calls dispatch per platform (win32=PowerShell / darwin=osascript / linux=zenity→kdialog); CI upgraded to a `windows/ubuntu/macos × node[20,22]` matrix (fail-fast false).
 - **Offline Web UI (cross-platform, visual rollback even when DSH is down)**: `tools/undo-server.mjs` (`node:http`, 127.0.0.1, single-instance lock) + `tools/webui/{index.html,app.js,styles.css}` + `tools/launch-undo.{bat,command,sh,desktop}` launchers; timeline / file-level diff / one-click rollback / diagnostic / safe-mode.
 - **Time Machine timeline**: snapshot timeline visualization, two-column file diff (added/removed highlighting, per-file nav, prev/next), entrance animation (honors `prefers-reduced-motion`).
 - **One-click diagnostic `undo_doctor`**: core `runDoctor` + chat tool `undo_doctor` + REST `GET /api/undo/doctor` + WebUI diagnostic button; checks store writability (real `.doctor-probe` write/rm), blob missing/orphan, settings health, snapshot scale — structured ok/warn/err report with fixes.
-- **Message-level undo `undo_message` / `undo_message_list`** (P6): `tools/pre-execute` side-channel records workspace file changes (whitelist `write/edit/replace/patch`, `workspaceDirs` scope, 60s time-window batching), restored in reverse (before-content / delete new files); `keepMessageOps`, `fileToolWhitelist`, `workspaceDirs`, `workspaceWatch` exposed via `DEFAULT_SETTINGS` and cfg.
-- **Snapshot slimming `undo_compact`** (P7): orphan-blob GC (blobs & leftover `.tmp` referenced by no snapshot/message batch), with `dry_run`.
+- **Message-level undo `undo_message` / `undo_message_list`** : `tools/pre-execute` side-channel records workspace file changes (whitelist `write/edit/replace/patch`, `workspaceDirs` scope, 60s time-window batching), restored in reverse (before-content / delete new files); `keepMessageOps`, `fileToolWhitelist`, `workspaceDirs`, `workspaceWatch` exposed via `DEFAULT_SETTINGS` and cfg.
+- **Snapshot slimming `undo_compact`** : orphan-blob GC (blobs & leftover `.tmp` referenced by no snapshot/message batch), with `dry_run`.
 - **Desktop shortcut (new)**: after the plugin loads it auto-creates a "dsh-undo-savepoint" shortcut on the desktop that double-click opens the offline tool (undo-server WebUI). Per-platform (win32=`cmd /c launch-undo.bat`, darwin=`launch-undo.command`, linux=`launch-undo.desktop`); idempotent (skip if exists); disable via `settings.createDesktopShortcut=false` or `DSH_UNDO_NO_DESKTOP=1`; `desktopDir` overridable (tests).
 - **ZIP interop fix**: `readZip` normalizes entry names `\` → `/` (NFC) so the pure-Node reader handles PowerShell `Compress-Archive` output — two-way format parity verified.
-- **Experience polish (P4)**: snapshot notes/tags (`undo_note` tool + `/api/undo/note`, editable from the WebUI timeline; `undo_snapshot` supports `note`/`tags`); scheduled snapshots (Settings `scheduledSnapshotEnabled`/`scheduledSnapshotMs`, creates auto snapshots on an interval + retention pruning); directory-tree diff (`/api/undo/tree` + WebUI left tree navigation, grouped by dir, add/del/mod coloring); encrypted ZIP export (`node:crypto` AES-256-GCM + scrypt, `DSHUNDOENC1` magic header; off by default to preserve PowerShell interop, importing with a password auto-decrypts).
+- **Experience polish **: snapshot notes/tags (`undo_note` tool + `/api/undo/note`, editable from the WebUI timeline; `undo_snapshot` supports `note`/`tags`); scheduled snapshots (Settings `scheduledSnapshotEnabled`/`scheduledSnapshotMs`, creates auto snapshots on an interval + retention pruning); directory-tree diff (`/api/undo/tree` + WebUI left tree navigation, grouped by dir, add/del/mod coloring); encrypted ZIP export (`node:crypto` AES-256-GCM + scrypt, `DSHUNDOENC1` magic header; off by default to preserve PowerShell interop, importing with a password auto-decrypts).
 - **Visualization polish**: timeline grouped by date into cards, note/tag chips, entrance/transition animation (honors `prefers-reduced-motion`); the in-DSH (client) header adds a "conversation undo" entry + message-level undo panel (reusing `/api/undo/messages` + `/api/undo/message`); the in-DSH snapshot panel gains an encrypted export/import password field (`/api/undo/export|import` with `password`) and a scheduled-snapshot setting (`scheduledSnapshotEnabled/Ms` on `/api/undo/settings`, aligned with the WebUI).
 - **Plugin logo & icon wiring**: image2.0 generation prompt `docs/logo-prompt.md`; Web page (`tools/webui/index.html`) favicon (`logo.svg` cross-platform placeholder + `logo.png` fallback once generated); desktop shortcut (`createWinLnk`) uses a custom icon when `tools/webui/logo.ico` exists (fallback `logo.png`, then system default); zero-dep `tools/make-ico.mjs` converts a transparent PNG into a Windows `.ico`.
-- **Configurable workspace scope (Scenario A)**: message undo gains a Settings field "Tracked workspace dirs" (`settings.workspaceDirs`), included in `publicSettings` and `POST /api/undo/settings` (dynamically linked with `DEFAULT_SETTINGS.workspaceDirs`); comma/semicolon-separated multi-select; non-empty replaces the default `[process.cwd()]`, empty = current dir only; zh/en i18n keys added; both the in-DSH panel and the Web UI settings pages expose this field, and the panel also adds `createDesktopShortcut`/`desktopDir` so both match.
+- **Configurable workspace scope **: message undo gains a Settings field "Tracked workspace dirs" (`settings.workspaceDirs`), included in `publicSettings` and `POST /api/undo/settings` (dynamically linked with `DEFAULT_SETTINGS.workspaceDirs`); comma/semicolon-separated multi-select; non-empty replaces the default `[process.cwd()]`, empty = current dir only; zh/en i18n keys added; both the in-DSH panel and the Web UI settings pages expose this field, and the panel also adds `createDesktopShortcut`/`desktopDir` so both match.
 - **Logo refresh (small)**: WebUI primary favicon uses the built-in `tools/webui/logo.svg` (852 B, smallest); the desktop shortcut uses a **64×64 transparent PNG (3.4 KB)** rasterized from `logo.svg` via headless Edge, turned into `tools/webui/logo.ico` (3.5 KB), with `logo.png` also 3.4 KB as fallback; the existing `.lnk` icon was re-pointed in place to the new ICO.
 
-### Fixes & hardening
+### Fixed
 
-- **Dependency discipline**: the plugin keeps zero runtime deps (ZIP, translate, picker, server all hand-written); R3 (per-snapshot ≤5MB, over-limit = manifest+warn only) and R4 (≤50M, `check-size` tightened to 5MB) gates keep regressing.
+- **Dependency discipline**: the plugin keeps zero runtime deps (ZIP, translate, picker, server all hand-written); the per-snapshot ≤5MB gate (over-limit = manifest+warn only) and the artifact size gate (`check-size` tightened to 5MB) keep regressing.
 - Test regression: smoke grew from 174 → 189 cases (message undo, orphan GC, zip interop, i18n completeness, doctor); e2e, home, check-size, check-version all green.
 
 ## [0.3.9] - 2026-08-22
 
-### Added (roadmap R1+R4+I13)
+### Added
 
-- **R1 · i18n (host / CLI / WebUI together)**:
+- **i18n (host / CLI / WebUI together)**:
   - New `lib/i18n/{zh,en}.json` is the single dictionary source (140 keys covering every user-visible host message and all WebUI strings); a zero-dependency translator `lib/i18n.mjs` (`t(key, vars?, lang?)`) picks language with priority `DSH_UNDO_LANG` > machine `Intl`/`LANG` Chinese > en fallback
   - Host `lib/index.js` now routes user-visible text through `t()`: safe mode (enter / already-on / rescan / neutralized / patch note / status / exit / corrupt-package refusal), undo/redo/restore result rendering, busy guard, and snapshot/list/diff/prune/export/import/recent output. `smoke` pins `DSH_UNDO_LANG=en` so existing English assertions stay valid
   - WebUI (`lib/client.js`) keeps `ctx.locale.register/bind` (confirmed compatible with rc8), and its inline zh/en dictionary is cross-checked against `lib/i18n` with a **single-source consistency assertion** (every client key exists non-empty in JSON, zh/en key sets match), preventing the two from drifting
   - Offline CLI (`dsh-undo.ps1` / `dsh-undo-savepoint-lib.ps1`): new `Get-UndoLanguage` / `Get-UndoText` (reads `lib/i18n/*.json`, selects via `DSH_UNDO_LANG` / `$PSUICulture`); `snapshot`, `undo` and other result text are bilingual. `.ps1` files keep UTF-8 with BOM
-- **R4 · artifact size gate tightened to 5M**: new `tools/check-size.mjs` scans `lib/` + `tools/` + top-level `package.json`/README/CHANGELOG/LICENSE/`cordis.patch.yml`, skipping `node_modules/.git/.github/docs`; `npm test` runs it first and fails on >5MB. Current artifact ≈565KB
-- **I13 · theme variables (`--dsw-alias-*`)**: WebUI `client.js` hard-coded colors moved to `--dsw-alias-bg-layer-1 / --dsw-alias-bg-mask-1 / --dsw-alias-border-l3 / --dsw-alias-state-error-primary / --dsw-alias-state-success-primary / --dsw-alias-state-business-primary` (`--dsw-specific-tip` kept), for theme switching
+- **artifact size gate tightened to 5M**: new `tools/check-size.mjs` scans `lib/` + `tools/` + top-level `package.json`/README/CHANGELOG/LICENSE/`cordis.patch.yml`, skipping `node_modules/.git/.github/docs`; `npm test` runs it first and fails on >5MB. Current artifact ≈565KB
+- **theme variables (`--dsw-alias-*`)**: WebUI `client.js` hard-coded colors moved to `--dsw-alias-bg-layer-1 / --dsw-alias-bg-mask-1 / --dsw-alias-border-l3 / --dsw-alias-state-error-primary / --dsw-alias-state-success-primary / --dsw-alias-state-business-primary` (`--dsw-specific-tip` kept), for theme switching
 
 ### Tests
 - smoke 174 → 180 (+6 WebUI/dictionary consistency assertions); full `npm test` chain (check-size → check-version → smoke → home-resolution → e2e) green
 - e2e 10/10 no regression; CLI `status` runs under `DSH_UNDO_LANG=en`
 
-### Entry points
+### Changed
 - Env var: `DSH_UNDO_LANG` (`zh`/`en`; defaults to Chinese on Chinese hosts, otherwise English)
 
 ## [0.3.8] - 2026-08-21
 
-### Added (Safe Mode 2.0, roadmap R2+P1+B4+B5+B6)
+### Added
 
-- **P1 · Safe-mode bundle neutralization**: safe mode previously only minimized the patch layer — useless when DSH cannot boot because a profile bundle fails the loader's hard checks. On entry, every `dsh.profile.bundles` entry is now validated with the same three rules as dsh-app-boot `loadProfile` (resolvable / has `dsh.bundle.patch` / patch file exists); failing entries are removed and written back (the original `package.json` is double-backed-up: snapshot + dedicated `safe-mode-pkg-<id>.json`). On exit the file is restored in full and the report names how many entries were neutralized. Edges: a missing `package.json` is skipped without blocking entry; a corrupt one refuses entry and is never destructively rewritten. Idempotent rescan: re-running `on` while active only rescans and reports, never rewrites
-- **B5 · Crash attribution v2 (crashReason)**: after a crash, the next startup scans the tail of candidate logs and classifies the crash as `session-corrupt` (session file damage) / `bundle-check` (bundle hard-check failure) / `patch-tree` (plugin mount/load failure) / `unknown`, persisted in `boot-state.json` (reused on the next boot so log rotation cannot lose the attribution). The `undo_list` crash banner now suggests a remedy per class (session-corrupt → `undo_scan`, bundle-check → safe mode), and `/api/undo/status` exposes `crashReason`
-- **B6 · `undo_scan` session health scan & repair**: scans `<home>/sessions/**/session.jsonl.zstd` and classifies each as `ok` / `fixable` (single-frame layout violation, the 8/18 crash root cause) / `corrupt` (undecodable / invalid first header line / bad JSON lines). With `quarantine=true`, `fixable` files are repaired in place: the original is copied to `<undo root>/corrupt-quarantine/` and kept as `.bak`, then recoded to "header frame + event frame" with triple verification (round-trip text identical / per-line JSON / re-analysis); `corrupt` files are only isolated (copied, never touched). Also ships `dsh-undo.ps1 scan [--fix] [-Label <home>]` and the offline script `tools/session-scan.mjs` (usable when DSH cannot boot). **Requires Node ≥22.15** (the `node:zlib` zstd API); on Node 20 `undo_scan` degrades to a clear "unsupported" notice while the rest of the plugin keeps working
-- **B4 · dsh-session-persistence-jsonl patch hosting**: the 3 tolerance patches (`appendBatch` self-heal / `listArtifacts` isolation / `readFirstZstdLine` tolerant) are hosted as `tools/dsh-patches.json` (old = rc8 original code, new = rc6 verified patches); `tools/apply-dsh-patches.ps1 status|verify|apply|remove` applies/reverts them offline (per-patch backup `.bak-<id>`, aborts on unknown state without writing). The plugin verifies read-only at startup and warns (never auto-edits files), and safe-mode entry reports missing patches too
+- **Safe-mode bundle neutralization**: safe mode previously only minimized the patch layer — useless when DSH cannot boot because a profile bundle fails the loader's hard checks. On entry, every `dsh.profile.bundles` entry is now validated with the same three rules as dsh-app-boot `loadProfile` (resolvable / has `dsh.bundle.patch` / patch file exists); failing entries are removed and written back (the original `package.json` is double-backed-up: snapshot + dedicated `safe-mode-pkg-<id>.json`). On exit the file is restored in full and the report names how many entries were neutralized. Edges: a missing `package.json` is skipped without blocking entry; a corrupt one refuses entry and is never destructively rewritten. Idempotent rescan: re-running `on` while active only rescans and reports, never rewrites
+- **Crash attribution v2 (crashReason)**: after a crash, the next startup scans the tail of candidate logs and classifies the crash as `session-corrupt` (session file damage) / `bundle-check` (bundle hard-check failure) / `patch-tree` (plugin mount/load failure) / `unknown`, persisted in `boot-state.json` (reused on the next boot so log rotation cannot lose the attribution). The `undo_list` crash banner now suggests a remedy per class (session-corrupt → `undo_scan`, bundle-check → safe mode), and `/api/undo/status` exposes `crashReason`
+- **`undo_scan` session health scan & repair**: scans `<home>/sessions/**/session.jsonl.zstd` and classifies each as `ok` / `fixable` (single-frame layout violation, the 8/18 crash root cause) / `corrupt` (undecodable / invalid first header line / bad JSON lines). With `quarantine=true`, `fixable` files are repaired in place: the original is copied to `<undo root>/corrupt-quarantine/` and kept as `.bak`, then recoded to "header frame + event frame" with triple verification (round-trip text identical / per-line JSON / re-analysis); `corrupt` files are only isolated (copied, never touched). Also ships `dsh-undo.ps1 scan [--fix] [-Label <home>]` and the offline script `tools/session-scan.mjs` (usable when DSH cannot boot). **Requires Node ≥22.15** (the `node:zlib` zstd API); on Node 20 `undo_scan` degrades to a clear "unsupported" notice while the rest of the plugin keeps working
+- **dsh-session-persistence-jsonl patch hosting**: the 3 tolerance patches (`appendBatch` self-heal / `listArtifacts` isolation / `readFirstZstdLine` tolerant) are hosted as `tools/dsh-patches.json` (old = rc8 original code, new = rc6 verified patches); `tools/apply-dsh-patches.ps1 status|verify|apply|remove` applies/reverts them offline (per-patch backup `.bak-<id>`, aborts on unknown state without writing). The plugin verifies read-only at startup and warns (never auto-edits files), and safe-mode entry reports missing patches too
 
 ### Polish
 - `undo_safe_mode` tool description and WebUI confirm copy updated to v0.3.8 capabilities (bundle neutralization)
 
 ### Tests
-- smoke 146 → 174 (5 new sections, 28 new assertions): P1 bundle-neutralization round trip + corrupt-package.json refusal, B5 log-signature classification (session-corrupt / bundle-check scenarios), B6 scan/repair/isolate/rescan, patch manifest old/new exactly matching the real rc8/rc6 targets
+- smoke 146 → 174 (5 new sections, 28 new assertions):  bundle-neutralization round trip + corrupt-package.json refusal,  log-signature classification (session-corrupt / bundle-check scenarios),  scan/repair/isolate/rescan, patch manifest old/new exactly matching the real rc8/rc6 targets
 - Fixed: edited `.ps1` files carry UTF-8 BOM again (case 25 encoding audit regression guard)
 - Final verification: smoke 174 green; e2e 10/10 no regression; home-resolution 2 branches green
 
 ## [0.3.7] - 2026-08-21
 
-### Fixed (emergency release)
+### Fixed
 - **issue #11: desktop-shortcut script encoding**: `tools/make-desktop-shortcut.ps1` converted to UTF-8 with BOM (Windows PowerShell 5.x on a Chinese system parsed the BOM-less UTF-8 file as GBK, breaking string quotes → ParserError → shortcut creation failed). A new smoke encoding-audit case fails any non-ASCII `.ps1/.bat` without BOM, preventing regression
 - **Safe mode self-deletion / dangling-reference fixes (completing the 8/17 retro)**
   - Empty-backup fallback: when the profile patch is missing on entry, the backup is written as `[]` (semantics: no user plugins to disable) instead of leaving a dangling reference that could never exit
@@ -83,7 +83,7 @@ Notable changes to dsh-undo-savepoint. Dates are in local time (UTC+8). 中文�
   - The `safeEffect` rc8 compatibility lid (already in the working tree) is now part of the release
 
 ### Improved
-- **5 MB per-snapshot budget (R3)**: `pluginMaxSnapshotBytes` 10 MB → 5 MB; manifests now record `totalBytes` (materialized size) and `undo_list` shows size plus a `[truncated]` marker. Over-budget snapshots keep the existing "manifest-only + warn, no data loss" behavior
+- **5 MB per-snapshot budget **: `pluginMaxSnapshotBytes` 10 MB → 5 MB; manifests now record `totalBytes` (materialized size) and `undo_list` shows size plus a `[truncated]` marker. Over-budget snapshots keep the existing "manifest-only + warn, no data loss" behavior
 - **Tiny-snapshot guarantee**: new smoke assertion — a snapshot with no external plugins stays under 100 KB total
 
 ### Tests
@@ -101,12 +101,12 @@ Notable changes to dsh-undo-savepoint. Dates are in local time (UTC+8). 中文�
 ### Improved
 - **npm install removed from docs**: README no longer advertises the npm-registry install; install options are now GitHub direct (way A) and local source (way B)
 
-### Entry points
+### Changed
 - Offline CLI: `dsh-undo.ps1 undo|redo|restore -SyncDeps`
 - Model tool: `undo_restore` gains an optional `sync_deps` boolean
 - REST: `/api/undo/undo|redo|restore` accept optional `syncDeps`
 
-### CI (Windows-only, no cross-platform)
+### Changed
 - **CI moved to windows-latest**: the plugin is Windows-only (`runPnpm` goes through `cmd.exe`, tests use a `.cmd` fake pnpm, bundled `.ps1/.bat` tools). CI previously ran on ubuntu-latest, where section 24's fake-pnpm test always failed (`pnpm.cmd` never runs on Linux; the missing marker then threw an uncaught ENOENT). CI now matches the real deployment environment
 - **fail-fast: false**: the node 20 / 22 matrix jobs each finish and report independently instead of cancelling each other
 - **home-resolution-test.mjs now runs in CI**: aligns CI with the 4-script `npm test` suite (the issue #6 DSH_HOME regression was previously skipped)
@@ -208,7 +208,7 @@ Notable changes to dsh-undo-savepoint. Dates are in local time (UTC+8). 中文�
 
 ## [0.3.0] - 2026-08-15
 
-### Added (safety net: crash attribution + safe mode + restart notice, phase 2)
+### Added
 - **Crash attribution upgrade**: the `.booting` marker becomes `boot-state.json` (per-run result + last-good-boot timestamp); after an abnormal exit, `undo_list` and the WebUI name the **concrete last-known-good snapshot** with a one-click rollback button
 - **One-click SAFE MODE**: `undo_safe_mode` tool (usable in chat) + WebUI "Safe mode" button in the snapshot panel + offline CLI `safe-mode on|off|status` — entering auto-snapshots, backs up `cordis.patch.yml` and minimizes the patch (undo only) so DSH can always boot; exiting restores the previous set. Ultimate fallback when DSH cannot boot at all
 - **Restart notice**: when an undo/redo/restore touches plugin code or the mount config, the report and WebUI clearly say "a DSH restart is required"; the rollback log records it too
@@ -224,7 +224,7 @@ Notable changes to dsh-undo-savepoint. Dates are in local time (UTC+8). 中文�
 
 ## [0.2.0] - 2026-08-15
 
-### Added (plugin-code-level rollback, phase 1)
+### Added
 - **Plugin code tree snapshots**: auto-discovers user plugins (junctions under `node_modules`, e.g. `D:\dsh\plugins\*`) plus profile-local code files (`name: './xxx'` entries in `cordis.patch.yml`, e.g. `router-global.mjs`) — a broken plugin EDIT is now undoable even when no config file changed (e.g. the whale-kit "yield* is not async iterable" incident)
 - **4 size safeguards**: extension whitelist (only code/config files — assets like gif/png never enter snapshots; dsh-pet 57MB -> ~47KB), content-addressed blob store (`<snapshotRoot>/blobs`, unchanged files cost nothing), per-file / per-snapshot caps (oversized files recorded as `skipped`), restore resolves by reference (missing blobs reported explicitly)
 - **Plugin-file diff**: `undo_diff` and the WebUI diff preview show `plugin:xxx` / `profile:xxx` entries

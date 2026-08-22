@@ -26,7 +26,7 @@ The snapshot's `cordis.patch.yml` is restored verbatim. If it mounts a plugin fr
 
 ---
 
-## 2. Cross-machine preflight (automatic since v0.4)
+## 2. Cross-machine preflight (automatic since v0.3.1)
 
 Restore scans the target snapshot's plugin references (patch mount entries + `package.json` bundles) and probes whether this machine can resolve them. Missing plugins are reported clearly:
 
