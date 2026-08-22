@@ -15,13 +15,9 @@ Dreading DSH crashes? Afraid a tiny edit becomes a disaster? One-click rollback 
 |---|
 | ![header](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/webui-header.png) |
 
-| WebUI snapshot timeline: crash banner + date-grouped cards (Diff / Restore / Edit note/tags / Delete) | GUI snapshot diff: file list + line-level highlighting |
-|---|---|
-| ![panel](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/webui-panel.en.png) | ![guidiff](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/gui-diff.en.png) |
-
-| GUI settings: debounce / retention / sensitive mode / dirs / scheduled snapshots / desktop shortcut |
+| WebUI snapshot timeline: crash banner + date-grouped cards (Diff / Restore / Edit note-tags / Delete). GUI window and diff screenshots: see [Offline tools](#offline-tools-work-even-when-dsh-wont-boot) |
 |---|
-| ![guisettings](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/gui-settings.en.png) |
+| ![panel](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/webui-panel.en.png) |
 
 ## Core capabilities
 
@@ -61,6 +57,10 @@ Dreading DSH crashes? Afraid a tiny edit becomes a disaster? One-click rollback 
 | Missing plugins after restore (cross-machine) | Preflight warning in the restore report; install first or use safe mode |
 | "My config suddenly changed" | CLI `recent` / chat `undo_recent` check the rollback log |
 | Rollback touched plugins/mounts | Report says "restart DSH for it to take effect" |
+
+| SAFE MODE confirmation: disables every user plugin except this one, so DSH always boots — then re-enable them one by one (UI language follows your system locale — Chinese UI shown) |
+|---|
+| ![safemode](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/safe-mode-confirm.png) |
 
 ## Installation
 
@@ -113,12 +113,22 @@ mklink /J "<your-dsh-install>\node_modules\dsh-undo-savepoint" "D:\dsh\plugins\d
 - **Custom shortcuts**: Settings → General → Undo/Redo shortcut (click the box then press a combo; Backspace clears)
 - **Save options**: Settings → General → Snapshot Settings (auto-save toggle, debounce, keep count, snapshot dirs, tracked workspace dirs; the 📁 button opens the native folder picker). "Tracked workspace dirs" accepts comma/semicolon-separated paths — non-empty replaces the default working-dir scope
 
+| Message-level undo: pick a message batch, roll back exactly the files it changed (UI language follows your system locale — Chinese UI shown) |
+|---|
+| ![msgundo](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/message-undo.png) |
+
 ## Offline tools (work even when DSH won't boot)
 
 **WebUI (recommended)** — run `node tools\undo-server.mjs` (or double-click `tools\launch-undo.bat` / `.command` / `.sh` / `.desktop`); it serves a local `127.0.0.1` page with the timeline / rollback / diff / diagnostics / SAFE MODE. A desktop shortcut is auto-created on plugin load.
 
 <details markdown="1">
 <summary>GUI window, CLI and the 30-line desktop-shortcut script</summary>
+
+| GUI snapshot diff: file list + line-level highlighting — see every change before rolling back | GUI settings: debounce / retention / sensitive mode / dirs / scheduled snapshots / desktop shortcut |
+|---|---|
+| ![guidiff](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/gui-diff.en.png) | ![guisettings](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/gui-settings.en.png) |
+
+> UI language follows your system locale — English UI shown here; Chinese-UI screenshots in [README.md](README.md).
 
 ```powershell
 # GUI window (WinForms): double-click tools\dsh-undo-savepoint-gui.bat, or:
