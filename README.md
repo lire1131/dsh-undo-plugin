@@ -11,21 +11,29 @@
 
 ## 预览
 
-| 会话头部：撤销 / 恢复 / 快照按钮全部图标化 + 自动快照状态徽章（点击徽章打开快照面板） |
+| 会话头部：撤销 / 恢复 / 快照 / 对话撤回全部图标化 + 自动快照状态徽章（已存 24 份 · 3 小时前） |
 |---|
 | ![header](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/webui-header.png) |
 
-| WebUI 快照管理面板（差异 / 回退 / 删除 / 清理 / 导出 / 导入 / 安全模式） | WebUI 设置「快照」独立栏目（敏感模式 / 插件白名单 / 目录选择） |
+| WebUI 快照时间线：崩溃横幅 + 日期分组卡片（对比 / 恢复 / 编辑备注 / 标签 / 删除） | DSH 设置「快照」独立栏目（自动保存 / 保留数量 / 敏感模式 / 插件白名单 / 定时快照） |
 |---|---|
 | ![panel](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/webui-panel.png) | ![settings](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/webui-settings-section.png) |
 
-| 局外 GUI 窗口（两行工具栏 + 安全模式按钮，DSH 挂了也能用） | 局外设置对话框（敏感模式 / 浏览选目录） |
+| 局外 GUI「快照管理」窗口：表格视图（DSH 挂了也能用） | GUI 快照对比：文件列表 + 行级差异高亮 |
 |---|---|
-| ![gui](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/gui-main.png) | ![guisettings](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/gui-settings.png) |
+| ![gui](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/gui-main.png) | ![guidiff](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/gui-diff.png) |
 
-| 安全模式确认（进入 / 退出） | 安全模式状态提示 |
+| WebUI 差异预览：多文件变更统计（+11 / -2）一目了然 | GUI 设置：防抖 / 保留数量 / 敏感模式 / 目录 / 定时快照 / 桌面快捷方式 |
 |---|---|
-| ![confirm](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/safe-mode-confirm.png) | ![done](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/safe-mode-done.png) |
+| ![webdiff](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/webui-diff.png) | ![guisettings](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/gui-settings.png) |
+
+| 编辑备注 / 标签（时间线内直接改） | 对话级撤回：按消息批次回滚文件改动 |
+|---|---|
+| ![note](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/webui-note.png) | ![msgundo](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/message-undo.png) |
+
+| 安全模式确认：禁用除本插件外的全部用户插件，保证 DSH 能启动 |
+|---|
+| ![safemode](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/safe-mode-confirm.png) |
 
 ## 核心能力
 
@@ -60,6 +68,8 @@ v0.4.0 起核心抽取为纯 Node 零依赖模块（`lib/core.mjs` / `lib/zip.mj
 
 > CI 为三平台矩阵（`windows/ubuntu/macos × node[20,22]`）。ZIP 导出 / 导入由纯 Node 零依赖 `lib/zip.mjs` 实现（deflate / 存储、CRC32、UTF-8），不引入运行时依赖，与 PowerShell 互操作已双向验证。
 
+> ![icon](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/app-icon.png)
+>
 > Logo / 图标：生成提示词见 `docs/logo-prompt.md`；WebUI favicon 用内置 `tools/webui/logo.svg`。自定义图标：透明 PNG 存为 `tools/webui/logo.png`，运行 `node tools/make-ico.mjs tools/webui/logo.png tools/webui/logo.ico` 生成 `.ico`，下次创建快捷方式时自动启用（回退顺序 `logo.ico` → `logo.png` → 系统默认）。
 
 ## 崩溃急救速查（按场景选工具）

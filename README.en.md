@@ -11,21 +11,17 @@ Dreading DSH crashes? Afraid a tiny edit becomes a disaster? One-click rollback 
 
 ## Preview
 
-| Conversation header: iconized Undo / Redo / Snapshot buttons + auto-snapshot status badge (click the badge to open the panel) |
+| Conversation header: iconized Undo / Redo / Snapshot / Message-undo buttons + auto-snapshot badge (24 snapshots · 3h ago) |
 |---|
 | ![header](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/webui-header.png) |
 
-| WebUI snapshot manager (diff / restore / delete / clean-up / export / import / SAFE MODE) | WebUI Settings — "Snapshots" section (sensitive mode / plugin whitelist / dir pickers) |
+| WebUI snapshot timeline: crash banner + date-grouped cards (Diff / Restore / Edit note/tags / Delete) | GUI snapshot diff: file list + line-level highlighting |
 |---|---|
-| ![panel](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/webui-panel.png) | ![settings](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/webui-settings-section.png) |
+| ![panel](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/webui-panel.en.png) | ![guidiff](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/gui-diff.en.png) |
 
-| Offline GUI window (two-row toolbar + SAFE MODE button; works when DSH is down) | Offline settings dialog (sensitive mode / Browse dirs) |
-|---|---|
-| ![gui](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/gui-main.png) | ![guisettings](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/gui-settings.png) |
-
-| SAFE MODE confirmation (enter / exit) | SAFE MODE status notice |
-|---|---|
-| ![confirm](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/safe-mode-confirm.png) | ![done](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/safe-mode-done.png) |
+| GUI settings: debounce / retention / sensitive mode / dirs / scheduled snapshots / desktop shortcut |
+|---|
+| ![guisettings](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/gui-settings.en.png) |
 
 ## Core capabilities
 
