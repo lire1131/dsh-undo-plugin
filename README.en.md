@@ -58,9 +58,9 @@ Dreading DSH crashes? Afraid a tiny edit becomes a disaster? One-click rollback 
 | "My config suddenly changed" | CLI `recent` / chat `undo_recent` check the rollback log |
 | Rollback touched plugins/mounts | Report says "restart DSH for it to take effect" |
 
-| SAFE MODE confirmation: disables every user plugin except this one, so DSH always boots — then re-enable them one by one (UI language follows your system locale — Chinese UI shown) |
+| SAFE MODE confirmation: disables every user plugin except this one, so DSH always boots — then re-enable them one by one |
 |---|
-| ![safemode](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/shots/safe-mode-confirm.png) |
+| ![safemode](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/shots/safe-mode-confirm.en.png) |
 
 ## Installation
 
