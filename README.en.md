@@ -41,6 +41,36 @@ An undo/rollback system for [DeepSeek Harness (DSH)](https://github.com/deepseek
 
 > Basic capabilities (keyboard shortcuts, chat commands, auto-cleanup, dual save modes, configurable options, …) are covered below and in the [Changelog](CHANGELOG.en.md).
 
+## v0.4.0 cross-platform & feature boost
+
+**v0.4.0 moves the plugin from Windows-only to Windows + macOS + Linux, and adds four powerful capabilities**:
+
+| New | What it does |
+|---|---|
+| **Three-platform support** | Core extracted to `lib/core.mjs` (pure Node, zero deps) with `lib/index.js` as a thin host shell; `.env`/ZIP/dialogs/pnpm dispatch per platform (win32=PowerShell, darwin=osascript, linux=zenity/kdialog); CI matrix `windows/ubuntu/macos × node[20,22]` |
+| **Offline Web UI (visual rollback even when DSH is down)** | `node tools/undo-server.mjs` (or `launch-undo.bat/.command/.sh/.desktop`) serves a local `127.0.0.1` page: timeline / rollback / diff / safe-mode / diagnostic — double-click and go, no DSH needed |
+| **Time Machine timeline** | Snapshot timeline visualization + file-level diff (added/removed line highlighting, per-file navigation, prev/next) + one-click rollback + entrance animation (honors `prefers-reduced-motion`) |
+| **One-click diagnostic `undo_doctor`** | Checks store writability, blob integrity (missing/orphan), settings health, snapshot scale; returns a structured ok/warn/error report with fix hints |
+| **Message-level undo `undo_message` / `undo_message_list`** | Records workspace file changes per AI message (or 60s batch); one sentence later roll back "what this message changed" (restore before-content / delete newly-created files) — no git, no session-store changes; scope is configurable in Settings → "Tracked workspace dirs" (comma/semicolon multi-select; non-empty replaces the default working dir) |
+| **Snapshot slimming `undo_compact`** | Orphan-blob GC (blobs and leftover `.tmp` referenced by no snapshot or message batch), freeing disk space |
+| **Desktop shortcut** | On plugin load, auto-creates a "dsh-undo-savepoint" shortcut on the desktop — double-click opens the offline tool (undo-server WebUI), even when DSH is down |
+
+**Platform matrix**:
+
+| Capability | Windows | macOS | Linux |
+|---|---|---|---|
+| Config/plugin snapshots, undo/redo | ✅ | ✅ | ✅ |
+| Offline CLI / GUI | ✅ (.bat/.ps1) | ✅ | ✅ |
+| Offline Web UI (undo-server) | ✅ | ✅ | ✅ |
+| File/dir selection dialog | PowerShell native | osascript | zenity→kdialog (fallback to manual path) |
+| CI regression | windows-latest | macos-latest | ubuntu-latest |
+
+> **ZIP implementation note (deviation from plan D7):** v0.4.0's export/import ZIP is written by a **pure-Node, zero-dep `lib/zip.mjs`** (deflate/store, CRC32, UTF-8 flag) instead of the plan's `archiver`+`unzipper` packages — avoiding runtime deps in the DSH plugin and keeping the offline path runnable, while remaining fully PowerShell Compre/Expand-Archive compatible (verified both directions). Easily swapped if you prefer the package approach.
+
+> **Size discipline (R3/R4):** per-snapshot referenced size ≤5MB (over-limit = manifest + warning only, no data loss); total plugin ≤50M (`check-size` gate is actually tightened to 5MB; current tarball ~0.6MB).
+
+> **Logo / icon:** the image2.0 (or any text-to-image) prompt lives in `docs/logo-prompt.md` (EN+CN+negative prompt+params). The Web primary favicon is the built-in `tools/webui/logo.svg` (smallest). For a custom icon, put a transparent PNG at `tools/webui/logo.png` and run `node tools/make-ico.mjs tools/webui/logo.png tools/webui/logo.ico` to place the `.ico` beside it (this repo's `logo.png`/`logo.ico` are a 64×64 raster of `logo.svg`, ~3.4 KB). When the shortcut is next (re)created it uses the custom icon (fallback order: `logo.ico` → `logo.png` → system default).
+
 ## Crash rescue quick reference (pick by scenario)
 
 | Scenario | Action |
@@ -175,11 +205,13 @@ After that, double-click the desktop **DSH Undo Manager** icon to open the exter
 - **Restore to a fixed version**: click "Restore to this" on a row in the panel; or tell the AI "restore to <id>"; or CLI `restore -Id <id>`.
 - **Delete a snapshot**: "Delete" in the panel; or CLI `remove -Id <id>`.
 - **Custom shortcuts**: Settings → General → Undo/Redo shortcut (click the box then press a combo; Backspace clears).
-- **Save options**: Settings → General → Snapshot Settings (auto-save toggle, debounce, keep count, two directories; the 📁 button opens the native folder picker).
+- **Save options**: Settings → General → Snapshot Settings (auto-save toggle, debounce, keep count, two directories, tracked workspace dirs; the 📁 button opens the native folder picker). The "Tracked workspace dirs" field accepts comma/semicolon-separated paths — non-empty replaces the default working-dir scope.
 
 ### Offline tools (works even when DSH won't boot)
 
 > UI language: force it with `DSH_UNDO_LANG=zh|en`; otherwise Chinese on Chinese hosts, English otherwise. Applies to the host command output, the offline CLI/GUI, and the WebUI. The single dictionary source is `lib/i18n/{zh,en}.json` (shared by host and WebUI so they cannot drift).
+
+> **v0.4.0 added offline Web UI (cross-platform)**: run `node tools\undo-server.mjs` (or double-click `launch-undo.bat`/`.command`/`.sh`/`.desktop`) to open a local `127.0.0.1` page with timeline / rollback / diff / diagnostics — works even when DSH is down.
 
 From the repository directory:
 
@@ -208,15 +240,21 @@ Typical rescue scenario: **DSH fails to boot with something like `duplicate load
 
 | Endpoint | Description |
 |---|---|
-| `GET /api/undo/status` | `{canUndo, canRedo, total}` |
+| `GET /api/undo/status` | `{canUndo, canRedo, total, bootAlert, safeModeActive, ...}` |
 | `GET /api/undo/list` | Snapshot list (with location: manual/auto/legacy) |
+| `GET /api/undo/diff` | `?id=<id>` file-level structured diff of a snapshot vs current |
+| `GET /api/undo/doctor` | One-click diagnostic (store writability / blob integrity / settings / scale) |
 | `GET/POST /api/undo/settings` | Read/write save options (auto-save, debounce, keep count, dirs); POST applies immediately |
 | `POST /api/undo/undo` | Undo the last change; optional body `{syncDeps: true}` rebuilds `node_modules` from the restored lockfile |
 | `POST /api/undo/redo` | Redo the last undo; optional body `{syncDeps: true}` |
 | `POST /api/undo/restore` | body `{id, syncDeps?}` — restore to a fixed version |
 | `POST /api/undo/remove` | body `{id}` — delete a snapshot |
 | `POST /api/undo/snapshot` | body `{reason}` — manual save |
-| `POST /api/undo/pick-dir` | Open the native folder picker, return the chosen path |
+| `POST /api/undo/prune` | Run expired-snapshot cleanup immediately |
+| `POST /api/undo/export` / `POST /api/undo/import` | Export/import all snapshots as ZIP (pure Node, PowerShell-compatible) |
+| `POST /api/undo/safe-mode` | body `{on}` — enter/exit safe mode |
+| `POST /api/undo/pick-dir` / `pick-file` | Open the native folder/file picker (per-platform), return the chosen path |
+| `GET /api/undo/locale` | Return the current language (`DSH_UNDO_LANG` or auto) |
 
 ## Design notes
 
@@ -231,6 +269,8 @@ Typical rescue scenario: **DSH fails to boot with something like `duplicate load
 - Tests (no DSH needed; run in the repository directory):
 
 ```bat
-node tools\smoke-test.mjs     :: 174 logic tests (snapshot/undo/redo/store split/no-change hint)
+node tools\smoke-test.mjs     :: 189 logic tests (snapshot/undo/redo/store split/no-change hint/message-undo/orphan-GC/zip-interop)
 node tools\e2e-watch.mjs      :: 10 real-timing regressions (auto-save/undo-no-harm/redo)
+node tools\check-size.mjs     :: R4 size gate (<5MB)
+node tools\check-version.mjs  :: semver validation
 ```

@@ -2,6 +2,29 @@
 
 Notable changes to dsh-undo-savepoint. Dates are in local time (UTC+8). 中文版:[CHANGELOG.md](CHANGELOG.md)
 
+## [0.4.0] - 2026-08-22
+
+### New features (upgrade plan V0.3.9→V0.4.0)
+
+- **Cross-platform**: core extracted to pure-Node, zero-dep `lib/core.mjs` (~1900 lines, ~100 exports) with `lib/index.js` as a thin host shell; ZIP (`lib/zip.mjs`, pure Node, PowerShell-compatible), dir/file pickers and pnpm calls dispatch per platform (win32=PowerShell / darwin=osascript / linux=zenity→kdialog); CI upgraded to a `windows/ubuntu/macos × node[20,22]` matrix (fail-fast false).
+- **Offline Web UI (cross-platform, visual rollback even when DSH is down)**: `tools/undo-server.mjs` (`node:http`, 127.0.0.1, single-instance lock) + `tools/webui/{index.html,app.js,styles.css}` + `tools/launch-undo.{bat,command,sh,desktop}` launchers; timeline / file-level diff / one-click rollback / diagnostic / safe-mode.
+- **Time Machine timeline**: snapshot timeline visualization, two-column file diff (added/removed highlighting, per-file nav, prev/next), entrance animation (honors `prefers-reduced-motion`).
+- **One-click diagnostic `undo_doctor`**: core `runDoctor` + chat tool `undo_doctor` + REST `GET /api/undo/doctor` + WebUI diagnostic button; checks store writability (real `.doctor-probe` write/rm), blob missing/orphan, settings health, snapshot scale — structured ok/warn/err report with fixes.
+- **Message-level undo `undo_message` / `undo_message_list`** (P6): `tools/pre-execute` side-channel records workspace file changes (whitelist `write/edit/replace/patch`, `workspaceDirs` scope, 60s time-window batching), restored in reverse (before-content / delete new files); `keepMessageOps`, `fileToolWhitelist`, `workspaceDirs`, `workspaceWatch` exposed via `DEFAULT_SETTINGS` and cfg.
+- **Snapshot slimming `undo_compact`** (P7): orphan-blob GC (blobs & leftover `.tmp` referenced by no snapshot/message batch), with `dry_run`.
+- **Desktop shortcut (new)**: after the plugin loads it auto-creates a "dsh-undo-savepoint" shortcut on the desktop that double-click opens the offline tool (undo-server WebUI). Per-platform (win32=`cmd /c launch-undo.bat`, darwin=`launch-undo.command`, linux=`launch-undo.desktop`); idempotent (skip if exists); disable via `settings.createDesktopShortcut=false` or `DSH_UNDO_NO_DESKTOP=1`; `desktopDir` overridable (tests).
+- **ZIP interop fix**: `readZip` normalizes entry names `\` → `/` (NFC) so the pure-Node reader handles PowerShell `Compress-Archive` output — two-way format parity verified.
+- **Experience polish (P4)**: snapshot notes/tags (`undo_note` tool + `/api/undo/note`, editable from the WebUI timeline; `undo_snapshot` supports `note`/`tags`); scheduled snapshots (Settings `scheduledSnapshotEnabled`/`scheduledSnapshotMs`, creates auto snapshots on an interval + retention pruning); directory-tree diff (`/api/undo/tree` + WebUI left tree navigation, grouped by dir, add/del/mod coloring); encrypted ZIP export (`node:crypto` AES-256-GCM + scrypt, `DSHUNDOENC1` magic header; off by default to preserve PowerShell interop, importing with a password auto-decrypts).
+- **Visualization polish**: timeline grouped by date into cards, note/tag chips, entrance/transition animation (honors `prefers-reduced-motion`); the in-DSH (client) header adds a "conversation undo" entry + message-level undo panel (reusing `/api/undo/messages` + `/api/undo/message`); the in-DSH snapshot panel gains an encrypted export/import password field (`/api/undo/export|import` with `password`) and a scheduled-snapshot setting (`scheduledSnapshotEnabled/Ms` on `/api/undo/settings`, aligned with the WebUI).
+- **Plugin logo & icon wiring**: image2.0 generation prompt `docs/logo-prompt.md`; Web page (`tools/webui/index.html`) favicon (`logo.svg` cross-platform placeholder + `logo.png` fallback once generated); desktop shortcut (`createWinLnk`) uses a custom icon when `tools/webui/logo.ico` exists (fallback `logo.png`, then system default); zero-dep `tools/make-ico.mjs` converts a transparent PNG into a Windows `.ico`.
+- **Configurable workspace scope (Scenario A)**: message undo gains a Settings field "Tracked workspace dirs" (`settings.workspaceDirs`), included in `publicSettings` and `POST /api/undo/settings` (dynamically linked with `DEFAULT_SETTINGS.workspaceDirs`); comma/semicolon-separated multi-select; non-empty replaces the default `[process.cwd()]`, empty = current dir only; zh/en i18n keys added; both the in-DSH panel and the Web UI settings pages expose this field, and the panel also adds `createDesktopShortcut`/`desktopDir` so both match.
+- **Logo refresh (small)**: WebUI primary favicon uses the built-in `tools/webui/logo.svg` (852 B, smallest); the desktop shortcut uses a **64×64 transparent PNG (3.4 KB)** rasterized from `logo.svg` via headless Edge, turned into `tools/webui/logo.ico` (3.5 KB), with `logo.png` also 3.4 KB as fallback; the existing `.lnk` icon was re-pointed in place to the new ICO.
+
+### Fixes & hardening
+
+- **Dependency discipline**: the plugin keeps zero runtime deps (ZIP, translate, picker, server all hand-written); R3 (per-snapshot ≤5MB, over-limit = manifest+warn only) and R4 (≤50M, `check-size` tightened to 5MB) gates keep regressing.
+- Test regression: smoke grew from 174 → 189 cases (message undo, orphan GC, zip interop, i18n completeness, doctor); e2e, home, check-size, check-version all green.
+
 ## [0.3.9] - 2026-08-22
 
 ### Added (roadmap R1+R4+I13)

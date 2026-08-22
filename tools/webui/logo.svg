@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#38a08f"/>
+      <stop offset="1" stop-color="#2f8f83"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="240" height="240" rx="54" fill="url(#bg)"/>
+  <!-- snapshot card stack -->
+  <g opacity="0.5">
+    <rect x="86" y="66" width="98" height="74" rx="12" fill="#f5a623" transform="rotate(-7 135 103)"/>
+    <rect x="74" y="80" width="106" height="80" rx="12" fill="#a9dcd4" transform="rotate(4 127 120)"/>
+  </g>
+  <!-- rewind arrow -->
+  <g fill="none" stroke="#ffffff" stroke-width="18" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M74 96 a 64 64 0 1 0 46 108"/>
+  </g>
+  <polygon points="72 62 124 84 88 118" fill="#ffffff"/>
+</svg>

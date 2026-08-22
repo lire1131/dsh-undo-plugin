@@ -43,6 +43,38 @@
 
 > 基础能力（键盘快捷键、对话指令、自动清理、双模式保存、可配置参数等）详见下文与 [更新日志](CHANGELOG.md)。
 
+## v0.4.0 全平台与功能增强
+
+**v0.4.0 把插件从「Windows 单平台」升级为「Windows + macOS + Linux 三平台」，并新增四个强力能力**：
+
+| 新能力 | 说明 |
+|---|---|
+| **三平台支持** | 核心抽取为 `lib/core.mjs`（纯 Node、零依赖）+ `lib/index.js` 转调主机壳；`.env`/ZIP/对话框/pnpm 均按平台分发（win32=PowerShell，darwin=osascript，linux=zenity/kdialog）；CI 三平台矩阵 `windows/ubuntu/macos × node[20,22]` |
+| **局外 WebUI（启动不了也能可视化回滚）** | `node tools/undo-server.mjs`（或 `launch-undo.bat/.command/.sh/.desktop`）拉起纯本地 `127.0.0.1` 服务器 + 内置网页：时间线/回滚/对比/安全模式/诊断，双击即用，不依赖 DSH |
+| **时间线 Time Machine** | 快照时间线按日期分组卡片化（备注/标签芯片、动效提升、尊重 `prefers-reduced-motion`）+ 文件级 diff（新增/删除行高亮、**目录树左栏导航**、逐文件浏览）+ 一键回滚 |
+| **体验增强（P4）** | 快照备注/标签（`undo_note` / `/api/undo/note` + WebUI 时间线直接编辑）、定时快照（`scheduledSnapshotEnabled`/`scheduledSnapshotMs` 间隔制，自动建档 + 保留清理）、目录树 diff（`/api/undo/tree`，按目录聚合、增/删/改着色）、ZIP 加密导出（`node:crypto` AES-256-GCM + scrypt，默认不加密保持 PowerShell 互通，导入带密码自动解密） |
+| **局内对话撤回** | 对话头部新增「对话撤回」入口 + 消息级撤回面板（复用餐 JSON REST `/api/undo/messages` + `/api/undo/message`），在 DSH 面板里即可撤回指定消息批次的文件改动 |
+| **一键诊断 `undo_doctor`** | 检查快照目录可写性、blob 完整性（缺失/孤儿）、设置文件健康、快照规模分布，输出 ok/warn/err 结构化报告与修复提示 |
+| **消息级撤销 `undo_message` / `undo_message_list`** | 按 AI 消息（或 60s 批次）记录工作区文件变更；发布后一句话回滚「这条消息改了什么」（恢复原内容/删新建文件），不依赖 git、不碰会话存储；「跟踪工作区目录」可在设置中配置（逗号/分号多选，非空时覆盖默认工作目录） |
+| **快照瘦身 `undo_compact`** | 孤儿 blob GC（不被任何快照/消息批次引用的 blob 与残留 `.tmp`），释放磁盘空间 |
+| **桌面快捷方式** | 插件加载后自动在桌面创建「dsh-undo-savepoint」快捷方式，双击直接打开局外工具（undo-server WebUI），DSH 挂了也能点开 |
+
+**平台矩阵**：
+
+| 能力 | Windows | macOS | Linux |
+|---|---|---|---|
+| 配置/插件快照、撤销/重做 | ✅ | ✅ | ✅ |
+| 局外 CLI / GUI | ✅（.bat/.ps1） | ✅（.command） | ✅（.sh） |
+| 局外 WebUI（undo-server） | ✅ | ✅ | ✅ |
+| 文件选择对话框 | PowerShell 原声 | osascript | zenity→kdialog（都没有则回退手输） |
+| CI 回归 | windows-latest | macos-latest | ubuntu-latest |
+
+> **ZIP 实现说明（与规划 D7 的偏差）**：v0.4.0 的导出/导入 ZIP 由**纯 Node 零依赖 `lib/zip.mjs`** 实现（deflate/存储、CRC32、UTF-8 标志），而非规划里推荐的 `archiver`+`unzipper` 第三方包——避免给 DSH 插件引入运行时依赖、保证离线局外可运行，同时完全兼容 PowerShell「扩展/压缩」互操作（已双向验证）。如需其他实现可再替换。
+
+> **体积纪律（R3/R4）**：单快照引用体积 ≤5MB（超限仅清单+告警，不丢数据）；插件整体 ≤50M（`check-size` 门禁实际收紧到 5MB，当前产物约 0.6MB）。
+
+> **Logo / 图标**：用 image2.0 等模型生成 Logo 的提示词见 `docs/logo-prompt.md`（英文+中文+反向词+参数）。Web 主 favicon 直接用内置 `tools/webui/logo.svg`（最小）；如需自定义图标，把透明 PNG 存到 `tools/webui/logo.png`，用 `node tools/make-ico.mjs tools/webui/logo.png tools/webui/logo.ico` 转成 `.ico` 放同目录，下次创建快捷方式时自动用自定义图标（回退顺序：`logo.ico` → `logo.png` → 系统默认）。当前仓库的 `logo.png`/`logo.ico` 即从 `logo.svg` 栅格化的 64×64 小图标（3.4 KB）。
+
 ## 崩溃急救速查（按场景选工具）
 
 | 场景 | 操作 |
@@ -179,11 +211,13 @@ explorer "$dshHome\profiles\web\node_modules\dsh-undo-savepoint\tools"
 - **回退到指定版本**:面板里点快照行「回退到此版本」;或对 AI 说"回退到 <id>";或 CLI `restore -Id <id>`。
 - **删除快照**:面板里点「删除」;或 CLI `remove -Id <id>`。
 - **自定义快捷键**:设置 → 通用 → 撤销/恢复快捷键(点击输入框后按组合键,Backspace 清除)。
-- **保存参数**:设置 → 通用 → 快照设置(自动保存开关、防抖、保留数、两个目录,目录旁 📁 按钮可打开系统目录选择器)。
+- **保存参数**:设置 → 通用 → 快照设置(自动保存开关、防抖、保留数、两个目录、跟踪工作区目录，目录旁 📁 按钮可打开系统目录选择器)。其中「跟踪工作区目录」逗号/分号多选，非空时覆盖默认工作目录。
 
 ### 局外工具(DSH 挂了也能用)
 
 > 界面语言:`DSH_UNDO_LANG=zh|en` 强制指定;未设置时中文系统默认中文、否则英文。服务端(host)命令输出、离线 CLI/GUI、WebUI 全部生效。词典源统一为 `lib/i18n/{zh,en}.json`(host 与 WebUI 共用,避免各写一份)。
+
+> **v0.4.0 新增局外 WebUI(跨平台)**:`node tools\undo-server.mjs`(或双击 `launch-undo.bat`/`.command`/`.sh`/`.desktop`)拉起本机 `127.0.0.1` 服务器与浏览器页面,时间线/回滚/对比/诊断全都有,DSH 挂了也能用。
 
 进入仓库目录后:
 
@@ -212,15 +246,21 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-plugin.ps1" add <
 
 | 端点 | 说明 |
 |---|---|
-| `GET /api/undo/status` | `{canUndo, canRedo, total}` |
+| `GET /api/undo/status` | `{canUndo, canRedo, total, bootAlert, safeModeActive, ...}` |
 | `GET /api/undo/list` | 快照列表(含 location: manual/auto/legacy) |
+| `GET /api/undo/diff` | `?id=<id>` 指定快照与当前的文件级结构化 diff |
+| `GET /api/undo/doctor` | 一键诊断(store 可写性 / blob 完整性 / settings / 规模) |
 | `GET/POST /api/undo/settings` | 读/写保存参数(自动保存、防抖、保留数、目录),POST 即时生效 |
 | `POST /api/undo/undo` | 撤销上一步;可选 body `{syncDeps: true}` 按还原后的 lockfile 重建 `node_modules` |
 | `POST /api/undo/redo` | 恢复;可选 body `{syncDeps: true}` |
 | `POST /api/undo/restore` | body `{id, syncDeps?}` 回退到指定版本 |
 | `POST /api/undo/remove` | body `{id}` 删除快照 |
 | `POST /api/undo/snapshot` | body `{reason}` 手动保存 |
-| `POST /api/undo/pick-dir` | 弹出系统目录选择器,返回选中路径 |
+| `POST /api/undo/prune` | 立即执行过期快照清理 |
+| `POST /api/undo/export` / `POST /api/undo/import` | 导出/导入全部快照 ZIP(纯 Node,兼容 PowerShell) |
+| `POST /api/undo/safe-mode` | body `{on}` 进入/退出安全模式 |
+| `POST /api/undo/pick-dir` / `pick-file` | 弹出系统目录/文件选择器(按平台分发),返回选中路径 |
+| `GET /api/undo/locale` | 返回当前语言(`DSH_UNDO_LANG` 或 auto) |
 
 ## 设计要点
 
@@ -235,6 +275,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "tools\dsh-plugin.ps1" add <
 - 测试(不需要 DSH 运行,在仓库目录执行):
 
 ```bat
-node tools\smoke-test.mjs     :: 174 项逻辑测试(快照/撤销/重做/存储分流/无变化提示)
+node tools\smoke-test.mjs     :: 189 项逻辑测试(快照/撤销/重做/存储分流/无变化提示/消息级撤销/孤儿GC/zip互操)
 node tools\e2e-watch.mjs      :: 10 项真实时序回归(自动存档/撤销不误伤/重做)
+node tools\check-size.mjs     :: R4 体积门禁(<5MB)
+node tools\check-version.mjs  :: 版本号 semver 校验
 ```

@@ -5,14 +5,16 @@ on:
     branches: [master]
   pull_request:
 
-# 本项目为纯 Windows 平台插件（runPnpm 走 cmd.exe、测试用 .cmd 假 pnpm、
-# 附带 .ps1/.bat 工具），CI 必须在 windows-latest 上跑，与真实部署环境一致。
+# 本项目 V0.4.0 起为三平台插件（core.mjs 纯逻辑 + 零依赖 ZIP + pnpm POSIX 分支 +
+# pickers 平台分发），CI 必须在 windows/ubuntu/macos 三平台 × node [20, 22] 上跑，
+# 与真实部署环境一致（macOS 无本机硬件，以 CI 补盲区）。
 jobs:
   test:
-    runs-on: windows-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
         node-version: [20, 22]
     steps:
       - uses: actions/checkout@v4

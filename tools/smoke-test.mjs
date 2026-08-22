@@ -3,8 +3,10 @@
 process.env.DSH_ROOT = process.env.DSH_ROOT ?? 'C:/Users/yzf';
 // 测试固定英文输出（V0.3.9 R7）：host 端随 DSH_UNDO_LANG 本地化，断言基于英文文案。
 process.env.DSH_UNDO_LANG = 'en';
-import { mkdtemp, writeFile, readFile, mkdir, rm as rmRaw, readdir } from 'node:fs/promises';
-import { join } from 'node:path';
+// 测试不碰真实桌面：DSH_UNDO_NO_DESKTOP=1 让 apply() 启动时的桌面快捷方式功能跳过。
+process.env.DSH_UNDO_NO_DESKTOP = '1';
+import { mkdtemp, writeFile, readFile, mkdir, rm as rmRaw, readdir, chmod } from 'node:fs/promises';
+import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import * as zlib from 'node:zlib';
@@ -737,15 +739,21 @@ check(cfgNames.every((n) => expectedDest.has(n)), 'snapshot config names all com
 const existing18 = ['profile-cordis.patch.yml', 'profile-package.json', 'profile-pnpm-workspace.yaml', 'profile-pnpm-lock.yaml', 'home-settings.yaml', 'home-cordis.patch.yml'];
 check(existing18.every((n) => cfgNames.includes(n)), 'every existing spec file is snapshotted');
 // fake pnpm on PATH: verify the explicit sync path and its command line.
-// 纯 Windows 设计：插件经 cmd.exe /d /s /c pnpm ... 调用，cmd 按 PATH 解析
-// pnpm.cmd（与真实部署一致）；CI 在 windows-latest 上运行。
+// 插件经 execFile('pnpm', args) 调用：Windows 上由 cmd 解析 PATH 里的 pnpm.cmd，
+// POSIX 上由 execFile 解析可执行的 pnpm 脚本（与真实部署一致）；CI 三平台矩阵均跑。
 const bin18 = join(root18, 'bin');
 await mkdir(bin18, { recursive: true });
 const marker18 = join(root18, 'pnpm-calls.txt');
 process.env.FAKE_PNPM_LOG = marker18;
-await writeFile(join(bin18, 'pnpm.cmd'), '@echo off\r\necho %*>> "%FAKE_PNPM_LOG%"\r\nexit /b 0\r\n');
+if (process.platform === 'win32') {
+  await writeFile(join(bin18, 'pnpm.cmd'), '@echo off\r\necho %*>> "%FAKE_PNPM_LOG%"\r\nexit /b 0\r\n');
+} else {
+  await writeFile(join(bin18, 'pnpm'), '#!/bin/sh\nprintf "%s\\n" "$*" >> "$FAKE_PNPM_LOG"\nexit 0\n');
+  await chmod(join(bin18, 'pnpm'), 0o755);
+}
 const oldPath18 = process.env.PATH;
-process.env.PATH = `${bin18};${oldPath18}`;
+const pathSep18 = process.platform === 'win32' ? ';' : ':';
+process.env.PATH = `${bin18}${pathSep18}${oldPath18}`;
 await writeFile(join(profile18, 'package.json'), '{"name":"test","v":3}\n');
 await run18('undo_snapshot', { reason: 'lock-v3' });
 out = await run18('undo_restore', { mode: 'undo', sync_deps: true });
@@ -1276,6 +1284,91 @@ await cleanup(root30);
   check(Object.keys(jsons.zh).length === Object.keys(jsons.en).length, 'lib/i18n zh/en key counts match (' + Object.keys(jsons.zh).length + ' vs ' + Object.keys(jsons.en).length + ')');
   const jsonOnly = Object.keys(jsons.zh).filter((k) => !(k in jsons.en));
   check(jsonOnly.length === 0, 'lib/i18n zh/en key sets identical (extra zh: ' + (jsonOnly.join(', ') || 'none') + ')');
+}
+
+// ── V0.4.0 P6：消息级撤销核心单测（工厂函数直连，不依赖 DSH 事件）────────────
+{
+  const core = await import('../lib/core.mjs');
+  const mroot = await mkdtemp(join(tmpdir(), 'dsh-undo-msg-'));
+  const mcfg = { autoDir: join(mroot, 'auto'), settingsFile: join(mroot, 'settings.json'), keepMessageOps: 200, profileName: 'test' };
+  await mkdir(join(mcfg.autoDir, 'message-ops'), { recursive: true });
+  const fa = join(mroot, 'a.txt'); const fb = join(mroot, 'b.txt');
+  await writeFile(fa, 'hello'); // 修改前内容
+  const b1 = core.sha1Hex(Buffer.from('hello'));
+  await core.writeBlob(mcfg, b1, Buffer.from('hello'));
+  await core.appendMessageOp(mcfg, { batchId: 'msg-x', messageId: 'm1', op: { tool: 'edit', path: fa, beforeHash: b1, beforeExists: true, ts: 1 } });
+  await writeFile(fa, 'hello world');                                   // 修改后
+  await core.appendMessageOp(mcfg, { batchId: 'msg-x', messageId: 'm1', op: { tool: 'write', path: fb, beforeHash: null, beforeExists: false, ts: 2 } });
+  await writeFile(fb, 'new');                                            // 新建
+  const ml = await core.listMessageOps(mcfg);
+  check(ml.length === 1 && ml[0].files === 2 && ml[0].messageId === 'm1', 'P6: message batch recorded with 2 ops');
+  const mu = await core.undoMessage(mcfg, 'msg-x');
+  check(mu.ok && mu.changed.length >= 1 && mu.deleted.length >= 1, 'P6: undoMessage reports changed + deleted');
+  check((await readFile(fa, 'utf8')) === 'hello', 'P6: modified file restored to before-content');
+  const fbGone = await readFile(fb, 'utf8').then(() => false).catch(() => true);
+  check(fbGone, 'P6: newly-created file deleted');
+  check((await core.readMessageOps(mcfg, 'msg-x'))?.batchId === 'msg-x', 'P6: batch file persists after undo');
+  await rm(mroot, { recursive: true, force: true });
+}
+
+// ── V0.4.0 P7: undo_compact — orphan blob GC + message-ops ref protection ─────
+{
+  const core = await import('../lib/core.mjs');
+  const croot = await mkdtemp(join(tmpdir(), 'dsh-undo-compact-'));
+  const ccfg = { autoDir: join(croot, 'auto'), settingsFile: join(croot, 'settings.json'), keepMessageOps: 5, profileName: 't' };
+  await mkdir(join(croot, 'blobs'), { recursive: true });
+  const refHash = core.sha1Hex(Buffer.from('referenced'));
+  await core.writeBlob(ccfg, refHash, Buffer.from('referenced'));
+  await core.appendMessageOp(ccfg, { batchId: 'c-msg', messageId: 'm', op: { tool: 'write', path: join(croot, 'x.txt'), beforeHash: refHash, beforeExists: true, ts: 1 } });
+  const orphanHash = core.sha1Hex(Buffer.from('orphan-data'));
+  await core.writeBlob(ccfg, orphanHash, Buffer.from('orphan-data')); // orphan (no ref)
+  await writeFile(join(croot, 'blobs', 'leftover.tmp'), 'partial'); // leftover tmp
+  check((await readdir(join(croot, 'blobs'))).length === 3, 'P7: 3 entries (ref + orphan + tmp) present');
+  const cp = await core.undoCompact(ccfg);
+  check(cp.ok && cp.removed >= 2, 'P7: compact removed orphan + tmp');
+  const remaining = await readdir(join(croot, 'blobs'));
+  check(remaining.includes(refHash) && !remaining.includes(orphanHash) && !remaining.includes('leftover.tmp') && remaining.length === 1, 'P7: referenced blob kept, orphan+tmp gone');
+  await rm(croot, { recursive: true, force: true });
+}
+
+// ── V0.4.0 P8: zip 互操作 — ps1(Compress-Archive) 用反斜杠条目名，readZip 须归一 ──
+{
+  const { writeZip, readZip } = await import('../lib/zip.mjs');
+  const zroot = await mkdtemp(join(tmpdir(), 'dsh-undo-zip-'));
+  const z = join(zroot, 'z.zip');
+  await writeZip(z, [{ name: 'manual\\abc\\manifest.json', data: Buffer.from('{"id":"abc"}') }, { name: 'manual\\abc\\home.yaml', data: Buffer.from('x') }]);
+  const e = await readZip(z);
+  check(e.length === 2 && e.some((x) => x.name === 'manual/abc/manifest.json'), 'P8: readZip normalizes backslash paths (ps1 interop)');
+  await rm(zroot, { recursive: true, force: true });
+}
+
+// ── V0.4.0 新增：桌面快捷方式 — plan 校验 + 幂等 + 创建（隔离 desktopDir，不碰真实桌面）──
+{
+  const core = await import('../lib/core.mjs');
+  const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
+  const platformNow = process.platform;
+  // 1) 三平台 plan 纯度校验（不依赖 COM/Desktop）
+  const pWin = core.desktopShortcutPlan({ platform: 'win32', desktopDir: 'C:\\Users\\t\\Desktop', pluginRoot: repoRoot });
+  check(pWin.kind === 'lnk' && pWin.path.endsWith('.lnk') && /launch-undo\.bat$/.test(pWin.target), 'desktop: win32 plan -> .lnk -> launch-undo.bat');
+  const pMac = core.desktopShortcutPlan({ platform: 'darwin', desktopDir: '/Users/t/Desktop', pluginRoot: repoRoot });
+  check(pMac.kind === 'command' && pMac.path.endsWith('.command') && /launch-undo\.command$/.test(pMac.source), 'desktop: darwin plan -> .command -> launch-undo.command');
+  const pLin = core.desktopShortcutPlan({ platform: 'linux', desktopDir: '/home/t/Desktop', pluginRoot: repoRoot });
+  check(pLin.kind === 'desktop' && pLin.path.endsWith('.desktop') && /launch-undo\.sh$/.test(pLin.exec), 'desktop: linux plan -> .desktop -> launch-undo.sh');
+  // 2) 幂等 + 本平台创建（隔离 desktopDir；force 绕过 DSH_UNDO_NO_DESKTOP）
+  const droot = await mkdtemp(join(tmpdir(), 'dsh-undo-desk-'));
+  const dres = await core.ensureDesktopShortcut({ createDesktopShortcut: true }, { desktopDir: droot, pluginRoot: repoRoot, force: true });
+  check(dres.action === 'created' || dres.action === 'exists', `desktop: ensure returns created/exists on ${platformNow} (got ${dres.action})`);
+  if (dres.ok && dres.action === 'created') {
+    check(await core.pathExists(dres.path), 'desktop: shortcut file materialized');
+    const again = await core.ensureDesktopShortcut({ createDesktopShortcut: true }, { desktopDir: droot, pluginRoot: repoRoot, force: true });
+    check(again.action === 'exists', 'desktop: idempotent on second call');
+  } else {
+    console.log(`  skip - desktop shortcut materialization unavailable on ${platformNow}: ${dres.error ?? dres.action}`);
+  }
+  // 3) 关闭开关 -> disabled
+  const dis = await core.ensureDesktopShortcut({ createDesktopShortcut: false }, { desktopDir: droot, pluginRoot: repoRoot, force: true });
+  check(dis.action === 'disabled', 'desktop: createDesktopShortcut=false disables');
+  await rm(droot, { recursive: true, force: true });
 }
 
 await rm(root, { recursive: true, force: true });

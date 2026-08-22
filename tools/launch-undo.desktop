@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=dsh-undo-savepoint 局外 WebUI
+Comment=DSH 挂掉时的一键回退面板（配置/插件/健康）
+Exec=sh -c 'exec node "$(dirname "$0")/undo-server.mjs" "$@"' -- %k
+Icon=system-file-manager
+Terminal=true
+Categories=Utility;

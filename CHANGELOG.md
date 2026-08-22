@@ -2,6 +2,29 @@
 
 dsh-undo-savepoint 的重要变更。日期为本地时间(UTC+8)。English version: [CHANGELOG.en.md](CHANGELOG.en.md)
 
+## [0.4.0] - 2026-08-22
+
+### 新功能（升级规划 V0.3.9→V0.4.0 落地）
+
+- **全平台适配**：核心抽离为纯 Node、零依赖的 `lib/core.mjs`（~1900 行，约 100 导出），`lib/index.js` 转为薄主机壳；ZIP（`lib/zip.mjs`，纯 Node 实现，兼容 PowerShell）、目录/文件选择器、pnpm 调用均按平台分发（win32=PowerShell / darwin=osascript / linux=zenity→kdialog）；CI 升级为三平台矩阵 `windows/ubuntu/macos × node[20,22]`（fail-fast false）。
+- **局外 WebUI（跨平台，DSH 挂了也能可视化回滚）**：`tools/undo-server.mjs`（`node:http`，绑定 127.0.0.1，单实例锁）+ `tools/webui/{index.html,app.js,styles.css}` + `tools/launch-undo.{bat,command,sh,desktop}` 启动器；时间线 / 文件级 diff / 一键回滚 / 诊断 / 安全模式全都有。
+- **时间线 Time Machine**：快照时间线可视化、文件级双栏 diff（新增/删除行高亮、逐文件导航、上一/下一文件）、入场动画（尊重 `prefers-reduced-motion`）。
+- **一键诊断 `undo_doctor`**：核心 `runDoctor` + 对话工具 `undo_doctor` + REST `GET /api/undo/doctor` + WebUI 诊断按钮；检查 store 可写性（真实 `.doctor-probe` 写/删）、blob 缺失/孤儿、settings 健康、快照规模，输出结构化 ok/warn/err 报告与修复提示。
+- **消息级撤销 `undo_message` / `undo_message_list`**（P6）：`tools/pre-execute` 旁路记录工作区文件变更（白名单 `write/edit/replace/patch`、`workspaceDirs` 范围、60s 时间窗批次），按反向序恢复 before 内容/删除新建文件；`keepMessageOps`、`fileToolWhitelist`、`workspaceDirs`、`workspaceWatch` 设于 `DEFAULT_SETTINGS` 与 cfg。
+- **快照瘦身 `undo_compact`**（P7）：孤儿 blob GC（不被任何快照/消息批次引用的 blob 与残留 `.tmp`），支持 `dry_run`。
+- **桌面快捷方式（新增）**：插件加载后自动在桌面创建「dsh-undo-savepoint」快捷方式，双击即打开局外工具（undo-server WebUI）。三平台分发（win32=`cmd /c launch-undo.bat`，darwin=`launch-undo.command`，linux=`launch-undo.desktop`）；幂等（已存在跳过）；`settings.createDesktopShortcut=false` 或 `DSH_UNDO_NO_DESKTOP=1` 可关闭；`desktopDir` 可覆盖（测试用）。
+- **ZIP 互操作修复**：`readZip` 将条目名 `\` 归一为 `/`（NFC），使纯 Node 能读 PowerShell `Compress-Archive` 产出的 ZIP——双向格式互通已验证。
+- **体验增强（P4）**：快照备注/标签（`undo_note` 工具 + `/api/undo/note`，WebUI 时间线可直接编辑；`undo_snapshot` 支持 `note`/`tags`）；定时快照（设置 `scheduledSnapshotEnabled`/`scheduledSnapshotMs`，按间隔自动创建 auto 快照并做保留清理）；目录树 diff（`/api/undo/tree` + WebUI 左栏树导航，按目录聚合、增/删/改着色）；ZIP 加密导出（`node:crypto` AES-256-GCM + scrypt，`DSHUNDOENC1` magic 头；默认不加密保持 PowerShell 互通，导入带密码自动解密）。
+- **可视化增强**：时间线按日期分组卡片化、备注/标签芯片、入场/过渡动效（尊重 `prefers-reduced-motion`）；局内（client）头部新增「对话撤回」入口与消息级撤回面板（复用 `/api/undo/messages` + `/api/undo/message`）；局内快照面板新增「加密导出/导入」密码输入（`/api/undo/export|import` 带 `password`）与「定时快照」设置（`/api/undo/settings` 的 `scheduledSnapshotEnabled/Ms`，与 WebUI 对齐）。
+- **插件 Logo 与图标接线**：新增 image2.0 生成提示词 `docs/logo-prompt.md`；Web 页面（`tools/webui/index.html`）接入 favicon（`logo.svg` 跨平台占位 + `logo.png` 生成后兜底）；桌面快捷方式（`createWinLnk`）在 `tools/webui/logo.ico` 存在时用自定义图标（回退 `logo.png`，再回退系统默认）；新增零依赖 `tools/make-ico.mjs` 把生成的透明 PNG 转成 Windows `.ico`。
+- **工作区范围可配置（Scenario A）**：消息级撤销新增设置页字段「跟踪工作区目录」（`settings.workspaceDirs`），纳入 `publicSettings` 与 `POST /api/undo/settings`（`DEFAULT_SETTINGS.workspaceDirs` 与之动态联动）；逗号/分号分隔可多选，非空时覆盖默认 `[process.cwd()]`，留空=仅当前工作目录；i18n 补 zh/en 键；局内面板（client）与局外 WebUI（app.js）的设置页已同步该字段，且面板补齐 `createDesktopShortcut`/`desktopDir` 显示，两边设置项一致。
+- **Logo 换新（小体积）**：WebUI 主 favicon 用内置 `tools/webui/logo.svg`（852 B，最小）；桌面快捷方式用从 `logo.svg` 经 headless Edge 栅格化的 **64×64 透明 PNG**（3.4 KB）转成 `tools/webui/logo.ico`（3.5 KB），`logo.png` 同 3.4 KB 作为兜底；现有 `.lnk` 图标原地指向新 ICO。
+
+### 修复与强化
+
+- **依赖纪律**：整个插件保持零运行时依赖（ZIP、translate、picker、server 全手写），R3（单快照引用 ≤5MB，超限仅清单+告警）与 R4（插件 ≤50M，`check-size` 收紧到 5MB）门禁持续回归。
+- 供测试回归：smoke 由 174 项扩至 189 项（消息级撤销、孤儿 GC、zip 互操、i18n 完整性、doctor），e2e、home、check-size、check-version 全绿。
+
 ## [0.3.9] - 2026-08-22
 
 ### 新功能（升级规划 R1+R4+I13 落地）
