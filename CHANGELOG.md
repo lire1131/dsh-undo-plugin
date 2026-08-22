@@ -2,6 +2,12 @@
 
 dsh-undo-savepoint 的重要变更。日期为本地时间(UTC+8)。English version: [CHANGELOG.en.md](CHANGELOG.en.md)
 
+## [0.4.1] - 2026-08-23
+
+### 修复
+
+- **macOS 延迟投递修复（CI e2e-watch）**：restore/undo 后 `ensureMount` 重写 `cordis.patch.yml` 的内容哈希登记入 `restoredHashes`，使 watcher 的内容 echo 检测识别「这是挂载管理写、非用户变更」；避免 macOS FSEvents 延迟投递事件在 `suppressAuto` 同步窗口外被当作真实变更，产生挡住 redo 的回声快照。已在三平台 CI 验证（此前仅 macOS 失败，现 macOS/ubuntu/windows 均绿）。
+
 ## [0.4.0] - 2026-08-22
 
 ### 新功能（升级规划 V0.3.9→V0.4.0 落地）
@@ -23,7 +29,6 @@ dsh-undo-savepoint 的重要变更。日期为本地时间(UTC+8)。English vers
 ### 修复与强化
 
 - **依赖纪律**：整个插件保持零运行时依赖（ZIP、translate、picker、server 全手写），R3（单快照引用 ≤5MB，超限仅清单+告警）与 R4（插件 ≤50M，`check-size` 收紧到 5MB）门禁持续回归。
-- **macOS 延迟投递修复（CI e2e-watch）**：restore/undo 后 `ensureMount` 重写 `cordis.patch.yml` 的内容哈希登记入 `restoredHashes`，使 watcher 的内容 echo 检测识别「这是挂载管理写、非用户变更」；避免 macOS FSEvents 延迟投递事件在 `suppressAuto` 同步窗口外被当作真实变更，产生挡住 redo 的回声快照。
 - 供测试回归：smoke 由 174 项扩至 189 项（消息级撤销、孤儿 GC、zip 互操、i18n 完整性、doctor），e2e、home、check-size、check-version 全绿。
 
 ## [0.3.9] - 2026-08-22

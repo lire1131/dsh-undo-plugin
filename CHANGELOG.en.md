@@ -2,6 +2,12 @@
 
 Notable changes to dsh-undo-savepoint. Dates are in local time (UTC+8). 中文版:[CHANGELOG.md](CHANGELOG.md)
 
+## [0.4.1] - 2026-08-23
+
+### Fixes
+
+- **macOS late-delivery fix (CI e2e-watch)**: after restore/undo, `ensureMount` records the content hash it rewrites into `cordis.patch.yml` into `restoredHashes`, so the watcher's content-echo detection recognizes it as mount bookkeeping, not a user change; this stops macOS FSEvents from delivering events outside the synchronous `suppressAuto` window and turning them into an echo snapshot that blocks redo. Verified across the three-platform CI (previously only macOS failed; now macOS/ubuntu/windows are green).
+
 ## [0.4.0] - 2026-08-22
 
 ### New features (upgrade plan V0.3.9→V0.4.0)
@@ -23,7 +29,6 @@ Notable changes to dsh-undo-savepoint. Dates are in local time (UTC+8). 中文�
 ### Fixes & hardening
 
 - **Dependency discipline**: the plugin keeps zero runtime deps (ZIP, translate, picker, server all hand-written); R3 (per-snapshot ≤5MB, over-limit = manifest+warn only) and R4 (≤50M, `check-size` tightened to 5MB) gates keep regressing.
-- **macOS late-delivery fix (CI e2e-watch)**: after restore/undo, `ensureMount` records the content hash it rewrites into `cordis.patch.yml` into `restoredHashes`, so the watcher's content-echo detection recognizes it as mount bookkeeping, not a user change; this stops macOS FSEvents from delivering events outside the synchronous `suppressAuto` window and turning them into an echo snapshot that blocks redo.
 - Test regression: smoke grew from 174 → 189 cases (message undo, orphan GC, zip interop, i18n completeness, doctor); e2e, home, check-size, check-version all green.
 
 ## [0.3.9] - 2026-08-22
