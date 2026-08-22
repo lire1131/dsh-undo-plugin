@@ -13,11 +13,11 @@ Dreading DSH crashes? Afraid a tiny edit becomes a disaster? One-click rollback 
 
 | Conversation header: iconized Undo / Redo / Snapshot / Message-undo buttons + auto-snapshot badge (24 snapshots · 3h ago) |
 |---|
-| ![header](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/webui-header.png) |
+| ![header](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/shots/webui-header.png) |
 
 | WebUI snapshot timeline: crash banner + date-grouped cards (Diff / Restore / Edit note-tags / Delete). GUI window and diff screenshots: see [Offline tools](#offline-tools-work-even-when-dsh-wont-boot) |
 |---|
-| ![panel](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/webui-panel.en.png) |
+| ![panel](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/shots/webui-panel.en.png) |
 
 ## Core capabilities
 
@@ -60,7 +60,7 @@ Dreading DSH crashes? Afraid a tiny edit becomes a disaster? One-click rollback 
 
 | SAFE MODE confirmation: disables every user plugin except this one, so DSH always boots — then re-enable them one by one (UI language follows your system locale — Chinese UI shown) |
 |---|
-| ![safemode](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/safe-mode-confirm.png) |
+| ![safemode](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/shots/safe-mode-confirm.png) |
 
 ## Installation
 
@@ -115,7 +115,7 @@ mklink /J "<your-dsh-install>\node_modules\dsh-undo-savepoint" "D:\dsh\plugins\d
 
 | Message-level undo: pick a message batch, roll back exactly the files it changed (UI language follows your system locale — Chinese UI shown) |
 |---|
-| ![msgundo](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/message-undo.png) |
+| ![msgundo](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/shots/message-undo.png) |
 
 ## Offline tools (work even when DSH won't boot)
 
@@ -126,7 +126,7 @@ mklink /J "<your-dsh-install>\node_modules\dsh-undo-savepoint" "D:\dsh\plugins\d
 
 | GUI snapshot diff: file list + line-level highlighting — see every change before rolling back | GUI settings: debounce / retention / sensitive mode / dirs / scheduled snapshots / desktop shortcut |
 |---|---|
-| ![guidiff](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/gui-diff.en.png) | ![guisettings](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/gui-settings.en.png) |
+| ![guidiff](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/shots/gui-diff.en.png) | ![guisettings](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/shots/gui-settings.en.png) |
 
 > UI language follows your system locale — English UI shown here; Chinese-UI screenshots in [README.md](README.md).
 
