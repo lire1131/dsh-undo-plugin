@@ -15,9 +15,9 @@ Dreading DSH crashes? Afraid a tiny edit becomes a disaster? One-click rollback 
 |---|
 | ![header](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/shots/webui-header.png) |
 
-| WebUI snapshot timeline: crash banner + date-grouped cards (Diff / Restore / Edit note-tags / Delete). GUI window and diff screenshots: see [Offline tools](#offline-tools-work-even-when-dsh-wont-boot) |
+| Offline WebUI: crash banner + Undo / Redo / Safe mode / Diagnose / Message undo / Settings — works even when DSH won't boot (snapshot diff & settings: see [Offline tools](#offline-tools-work-even-when-dsh-wont-boot)) |
 |---|
-| ![panel](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/shots/webui-panel.en.png) |
+| ![gui](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/shots/gui-main.en.png) |
 
 ## Core capabilities
 
@@ -113,22 +113,26 @@ mklink /J "<your-dsh-install>\node_modules\dsh-undo-savepoint" "D:\dsh\plugins\d
 - **Custom shortcuts**: Settings → General → Undo/Redo shortcut (click the box then press a combo; Backspace clears)
 - **Save options**: Settings → General → Snapshot Settings (auto-save toggle, debounce, keep count, snapshot dirs, tracked workspace dirs; the 📁 button opens the native folder picker). "Tracked workspace dirs" accepts comma/semicolon-separated paths — non-empty replaces the default working-dir scope
 
-| Message-level undo: pick a message batch, roll back exactly the files it changed (UI language follows your system locale — Chinese UI shown) |
+| Message-level undo: pick a message batch, roll back exactly the files it changed |
 |---|
-| ![msgundo](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/shots/message-undo.png) |
+| ![msgundo](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/shots/message-undo.en.png) |
 
 ## Offline tools (work even when DSH won't boot)
 
 **WebUI (recommended)** — run `node tools\undo-server.mjs` (or double-click `tools\launch-undo.bat` / `.command` / `.sh` / `.desktop`); it serves a local `127.0.0.1` page with the timeline / rollback / diff / diagnostics / SAFE MODE. A desktop shortcut is auto-created on plugin load.
 
-<details markdown="1">
-<summary>GUI window, CLI and the 30-line desktop-shortcut script</summary>
+| Desktop shortcut: auto-created on plugin load, double-click to open the offline WebUI |
+|---|
+| ![shortcut](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/shots/shortcut-icon.png) |
 
-| GUI snapshot diff: file list + line-level highlighting — see every change before rolling back | GUI settings: debounce / retention / sensitive mode / dirs / scheduled snapshots / desktop shortcut |
+| Snapshot diff: file list + change stats (+8 / -2) + line-level highlighting — see every change before rolling back | Offline settings: debounce / retention / redaction mode / dirs / desktop shortcut |
 |---|---|
 | ![guidiff](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/shots/gui-diff.en.png) | ![guisettings](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/shots/gui-settings.en.png) |
 
 > UI language follows your system locale — English UI shown here; Chinese-UI screenshots in [README.md](README.md).
+
+<details markdown="1">
+<summary>GUI window, CLI and the 30-line desktop-shortcut script</summary>
 
 ```powershell
 # GUI window (WinForms): double-click tools\dsh-undo-savepoint-gui.bat, or:

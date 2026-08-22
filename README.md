@@ -15,11 +15,11 @@
 |---|
 | ![header](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/shots/webui-header.png) |
 
-| WebUI 快照时间线：崩溃横幅 + 日期分组卡片（对比 / 恢复 / 编辑备注 / 标签 / 删除） | DSH 设置「快照」独立栏目（自动保存 / 保留数量 / 敏感模式 / 插件白名单 / 定时快照） |
+| WebUI 快照面板：手动保存 / 撤销 / 恢复 / 清理 / 导出导入 / 安全模式，逐条「差异 / 回退到此版本 / 删除」 | DSH 设置「快照」独立栏目（自动保存 / 保留数量 / 敏感模式 / 插件白名单 / 定时快照） |
 |---|---|
 | ![panel](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/shots/webui-panel.png) | ![settings](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/shots/webui-settings-section.png) |
 
-| 局外 GUI「快照管理」窗口：表格视图，不依赖 DSH 运行（快照对比弹窗见[局外工具](#局外工具dsh-挂了也能用)一节） |
+| 局外 WebUI：崩溃横幅 + 撤销 / 重做 / 安全模式 / 诊断 / 对话撤回 / 设置，不依赖 DSH 运行（快照对比与设置见[局外工具](#局外工具dsh-挂了也能用)一节） |
 |---|
 | ![gui](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/shots/gui-main.png) |
 
@@ -134,6 +134,10 @@ mklink /J "<你的DSH安装>\node_modules\dsh-undo-savepoint" "D:\dsh\plugins\ds
 |---|
 | ![msgundo](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/shots/message-undo.png) |
 
+| 差异预览：文件级变更红删绿增，确认无误再回滚 | 编辑备注 / 标签：快照列表里直接改 |
+|---|---|
+| ![webdiff](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/shots/webui-diff.png) | ![note](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/shots/webui-note.png) |
+
 ## 局外工具（DSH 挂了也能用）
 
 ### 局外 WebUI（推荐，全平台）
@@ -144,9 +148,13 @@ node tools/undo-server.mjs     # 或双击 launch-undo.bat / .command / .sh / .d
 
 拉起纯本地 `127.0.0.1` 服务器 + 内置网页：时间线 / 回滚 / 对比 / 安全模式 / 诊断，双击即用，不依赖 DSH。插件加载后还会自动在桌面创建「dsh-undo-savepoint」快捷方式，双击直接打开。
 
-| WebUI 差异预览：多文件变更统计（+11 / -2）与行级差异一目了然，确认无误再回滚 |
+| 桌面快捷方式：插件加载后自动创建，双击直接打开局外 WebUI |
 |---|
-| ![webdiff](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/shots/webui-diff.png) |
+| ![shortcut](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/shots/shortcut-icon.png) |
+
+| 快照对比：文件列表 + 变更统计（+8 / -2）+ 行级差异高亮 | 局外设置：防抖 / 保留数量 / 脱敏模式 / 目录选择 / 桌面快捷方式 |
+|---|---|
+| ![guidiff](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/shots/gui-diff.png) | ![guisettings](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/shots/gui-settings.png) |
 
 ### 工具位置
 
@@ -156,10 +164,6 @@ node tools/undo-server.mjs     # 或双击 launch-undo.bat / .command / .sh / .d
 |---|---|
 | 方式 A：`dsh plugin add` | `$DSH_HOME\profiles\web\node_modules\dsh-undo-savepoint\tools\`（DSH_HOME 默认 `%USERPROFILE%\.dsh`） |
 | 方式 B：clone + junction | 你 clone 的目录 `...\dsh-undo-savepoint\tools\` |
-
-| GUI 快照对比：文件列表 + 行级差异高亮，回滚前先看清每一处改动 | GUI 设置：防抖 / 保留数量 / 敏感模式 / 目录 / 定时快照 / 桌面快捷方式 |
-|---|---|
-| ![guidiff](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/shots/gui-diff.png) | ![guisettings](https://cdn.jsdelivr.net/gh/lire1131/dsh-undo-savepoint@master/docs/shots/gui-settings.png) |
 
 <details>
 <summary>一键创建桌面快捷方式（点开查看 PowerShell 命令）</summary>
